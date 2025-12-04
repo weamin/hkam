@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>彩票风控系统 v6.13</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body { -webkit-tap-highlight-color: transparent; padding-bottom: env(safe-area-inset-bottom); background-color: #f8fafc; touch-action: manipulation; }
+        .safe-bottom { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-pulse-slow { animation: pulse-slow 3s infinite; }
+        input, textarea, select { font-size: 16px !important; } 
+        .modal-overlay { z-index: 9999; }
+        #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; max-width: 28rem; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+        // --- 1. 图标组件 ---
+        const Icon = ({ name, className }) => {
+            const icons = {
+                Calculator: <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />,
+                Settings: <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />,
+                Zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />,
+                Trash2: <g><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></g>,
+                Send: <g><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></g>,
+                Eraser: <g><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" /><path d="M22 21H7" /><path d="m5 11 9 9" /></g>,
+                ClipboardCheck: <g><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></g>,
+                Scale: <g><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z" /><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z" /><path d="M7 21h10" /><path d="M12 3v18" /><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" /></g>,
+                FileText: <g><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></g>,
+                Eye: <g><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></g>,
+                Check: <polyline points="20 6 9 17 4 12" />,
+                X: <g><path d="M18 6 6 18" /><path d="M6 6l12 12" /></g>,
+                AlertTriangle: <g><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></g>,
+                ChevronDown: <path d="m6 9 6 6 6-6" />,
+                BookOpen: <g><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></g>,
+                ShieldAlert: <g><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></g>,
+                User: <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />,
+                UserCircle: <g><circle cx="12" cy="12" r="10" /><circle cx="12" cy="10" r="3" /><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" /></g>,
+                Copy: <g><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></g>
+            };
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {icons[name] || <circle cx="12" cy="12" r="10" />}
+                </svg>
+            );
+        };
+
+        // --- 2. 常量与工具函数 ---
+        const ZODIAC_LIST = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+        const ALL_NUMBERS = Array.from({length: 49}, (_, i) => i + 1);
+
+        const WAVES = {
+            'RED': [1, 2, 7, 8, 12, 13, 18, 19, 23, 24, 29, 30, 34, 35, 40, 45, 46],
+            'BLUE': [3, 4, 9, 10, 14, 15, 20, 25, 26, 31, 36, 37, 41, 42, 47, 48],
+            'GREEN': [5, 6, 11, 16, 17, 21, 22, 27, 28, 32, 33, 38, 39, 43, 44, 49]
+        };
+
+        const isOdd = (n) => n % 2 !== 0;
+        const isEven = (n) => n % 2 === 0;
+        const isSmall = (n) => n >= 1 && n <= 24; 
+        const isBig = (n) => n >= 25 && n <= 49; 
+        const getSumDigit = (n) => Math.floor(n / 10) + (n % 10); 
+
+        const KEYWORDS = {
+            '红波': WAVES.RED, '红': WAVES.RED,
+            '蓝波': WAVES.BLUE, '蓝': WAVES.BLUE,
+            '绿波': WAVES.GREEN, '绿': WAVES.GREEN,
+            '红双': WAVES.RED.filter(isEven), '红单': WAVES.RED.filter(isOdd),
+            '蓝双': WAVES.BLUE.filter(isEven), '蓝单': WAVES.BLUE.filter(isOdd),
+            '绿双': WAVES.GREEN.filter(isEven), '绿单': WAVES.GREEN.filter(isOdd),
+            '单数': ALL_NUMBERS.filter(isOdd), '单': ALL_NUMBERS.filter(isOdd),
+            '双数': ALL_NUMBERS.filter(isEven), '双': ALL_NUMBERS.filter(isEven),
+            '小单': ALL_NUMBERS.filter(n => isSmall(n) && isOdd(n)), '小双': ALL_NUMBERS.filter(n => isSmall(n) && isEven(n)),
+            '大单': ALL_NUMBERS.filter(n => isBig(n) && isOdd(n)), '大双': ALL_NUMBERS.filter(n => isBig(n) && isEven(n)),
+            '合数单': ALL_NUMBERS.filter(n => getSumDigit(n) % 2 !== 0), '合单': ALL_NUMBERS.filter(n => getSumDigit(n) % 2 !== 0),
+            '合数双': ALL_NUMBERS.filter(n => getSumDigit(n) % 2 === 0), '合双': ALL_NUMBERS.filter(n => getSumDigit(n) % 2 === 0),
+        };
+
+        const PATTERN_HK = "香港|香|港";
+        const PATTERN_MO = "澳门|澳|门|奥|新澳门|老澳门"; 
+        const PATTERN_DUAL_STR = "香[^0-9a-zA-Z\\u4e00-\\u9fa5]*门"; 
+        const REGEX_DUAL = new RegExp(PATTERN_DUAL_STR);
+
+        const CH_NUM = "零一二三四五六七八九十百千两";
+        const UNITS = "元米斤块";
+
+        // 增强版金额正则
+        const BASE_AMOUNT_PARTS = [
+            `((各|买|x|X|号|=|每)\\s*\\d+(\\.\\d+)?\\s*[.,]*\\s*[${UNITS}]?)`, 
+            `(\\d+(\\.\\d+)?\\s*[.,]*\\s*[${UNITS}])`, 
+            `(\\d+(\\.\\d+)?x)`, 
+            `((各|买|x|X|号|=|每)\\s*[${CH_NUM}]+\\s*[${UNITS}]?)`, 
+            `([${CH_NUM}]+\\s*[${UNITS}])`, 
+            `((?<=[\\d\\s])[${CH_NUM}]+(?!([岁尾头])))`, 
+            `(?<=[号])\\d+(\\.\\d+)?` 
+        ].join("|");
+
+        const REGEX_AMOUNT_NO_SLASH = new RegExp(BASE_AMOUNT_PARTS, 'gi');
+        const REGEX_AMOUNT_WITH_SLASH = new RegExp(`${BASE_AMOUNT_PARTS}|(\\/\\d+(\\.\\d+)?\\s*[${UNITS}]?)`, 'gi');
+        const REGEX_AMOUNT_DELIMITER = REGEX_AMOUNT_WITH_SLASH;
+        const REGEX_CHAT_HEADER = /^.*(\(xxf\)|15759804578|[:：]$).*/i;
+        const REGEX_CLIENT_TOTAL = /[（(](?:一共|总计)[^)）]*\d+[^)）]*[）)]/;
+
+        const parseChineseNumber = (chNumStr) => {
+            const map = { '零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000 };
+            if (chNumStr.length === 1 && map[chNumStr] !== undefined && map[chNumStr] < 10) return map[chNumStr];
+            let result = 0;
+            if (/[十百千]/.test(chNumStr)) {
+                let currentNum = 0;
+                for (let i = 0; i < chNumStr.length; i++) {
+                    const char = chNumStr[i];
+                    const val = map[char];
+                    if (val >= 10) { if (currentNum === 0) currentNum = 1; result += currentNum * val; currentNum = 0; } 
+                    else if (val !== undefined) { currentNum = val; }
+                }
+                result += currentNum;
+            }
+            return result > 0 ? result : NaN;
+        };
+
+        // --- 3. 辅助组件 ---
+        const ActionSheet = ({ title, actions, onCancel }) => {
+            if (!actions) return null;
+            return (
+                <div className="fixed inset-0 bg-black/50 z-[100] flex items-end sm:items-center justify-center p-4 modal-overlay animate-in fade-in">
+                    <div className="bg-white w-full max-w-sm rounded-xl p-4 space-y-3 shadow-2xl slide-in-from-bottom-10">
+                        {title && <div className="text-center font-bold text-gray-500 pb-2 border-b text-sm">{title}</div>}
+                        {actions.map((action, idx) => (
+                            <button 
+                                key={idx} 
+                                onClick={action.onClick}
+                                className={`w-full py-3.5 rounded-lg font-bold text-center text-lg ${action.className || 'bg-gray-100 text-gray-800'}`}
+                            >
+                                {action.text}
+                            </button>
+                        ))}
+                        <button onClick={onCancel} className="w-full py-3 rounded-lg font-bold text-center text-gray-500 border bg-white mt-2">取消</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const ConfirmationModal = ({ confirmation }) => {
+            if (!confirmation) return null;
+            return (
+                <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 modal-overlay">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4 animate-in zoom-in-95">
+                        <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center"><Icon name="AlertTriangle" className="w-6 h-6 text-red-600"/></div>
+                        <p className="text-center font-bold text-lg text-slate-800 whitespace-pre-line">{confirmation.message}</p>
+                        <div className="flex gap-3 pt-2">
+                            {confirmation.buttons ? (
+                                confirmation.buttons.map((btn, i) => (
+                                    <button key={i} onClick={btn.onClick} className={`flex-1 py-3 rounded font-bold ${btn.className}`}>{btn.text}</button>
+                                ))
+                            ) : (
+                                <>
+                                    <button onClick={confirmation.onCancel} className="flex-1 py-2 rounded border hover:bg-slate-100">取消</button>
+                                    <button onClick={confirmation.onConfirm} className="flex-1 py-2 rounded bg-red-600 text-white hover:bg-red-700">确认</button>
+                                </>
+                            )}
+                        </div>
+                        {confirmation.buttons && (
+                            <button onClick={confirmation.onCancel} className="w-full py-2 text-slate-400 text-sm mt-2 text-center">取消</button>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const CustomerSelectModal = ({ customers, onSelect, onClose }) => (
+            <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 modal-overlay animate-in fade-in">
+                <div className="bg-white w-full max-w-sm rounded-xl p-4 max-h-[80vh] flex flex-col shadow-2xl">
+                    <div className="flex justify-between items-center mb-4 border-b pb-2">
+                        <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Icon name="User" className="w-5 h-5 text-indigo-600"/> 选择客户</h3>
+                        <button onClick={onClose}><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto space-y-2">
+                        {customers.map(c => (
+                            <button key={c.id} onClick={() => onSelect(c.name)} className="w-full text-left p-3 rounded-lg hover:bg-indigo-50 border border-slate-100 font-bold text-slate-700 flex items-center justify-between active:bg-indigo-100 transition-colors">
+                                <span>{c.name}</span>
+                                <span className="text-xs text-slate-400 font-normal">赔{c.odds} / 退{c.rebate*100}%</span>
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={onClose} className="mt-4 w-full py-3 border rounded-lg text-slate-500 font-medium">取消</button>
+                </div>
+            </div>
+        );
+
+        const MessageToast = ({ message }) => {
+            if (!message) return null;
+            const color = message.type === 'success' ? 'bg-green-500' : message.type === 'warning' ? 'bg-orange-500' : 'bg-red-500';
+            return <div className={`fixed top-4 right-4 z-[100] flex gap-3 p-4 rounded-lg shadow-xl text-white ${color}`}><Icon name="Check" className="w-5 h-5"/><span>{message.text}</span></div>;
+        };
+
+        const MobileRiskTable = ({title,color,data,total}) => (
+            <div className="bg-white rounded shadow border border-slate-200 flex flex-col h-full overflow-hidden">
+                <div className={`p-2 text-center font-bold text-xs ${color==='red'?'bg-red-50 text-red-700':'bg-green-50 text-green-700'}`}>{title} (¥{total.toLocaleString()})</div>
+                <div className="flex-1 overflow-y-auto">
+                    <table className="w-full text-xs text-center">
+                        <thead className="bg-slate-50 text-slate-400"><tr><th className="py-1">号</th><th>注</th><th>亏</th></tr></thead>
+                        <tbody>
+                            {data.map(d=>(
+                                <tr key={d.num} className={`border-b last:border-0 ${d.customerPL>0?'bg-red-50':''}`}>
+                                    <td className="py-2 font-bold">{d.num}</td>
+                                    <td className="text-slate-500">{d.betAmt>0?d.betAmt:'-'}</td>
+                                    <td className={d.customerPL>0?'text-red-600 font-bold':'text-green-600'}>{Math.round(d.customerPL)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+        
+        const EditOrderModal = ({ batchId, onClose, onSave, bets, parseContentForSegments }) => {
+            const recs = bets.filter(b=>b.batchId===batchId);
+            const rawLines = Array.from(new Set(recs.map(r=>r.rawInput))).filter(l=>l);
+            const [lines, setLines] = useState(rawLines);
+            const header = recs[0]?.originalHeader;
+            const clientTotal = recs[0]?.originalTotal;
+            const fullText = recs[0]?.fullText; 
+            const originalDisplay = fullText || rawLines.join('\n');
+
+            const stats = lines.map(l => {
+                const segs = parseContentForSegments(l, '0');
+                const valid = segs.length>0 && segs.every(s=>s.isValid && !s.isSuspicious);
+                const amt = segs.reduce((a,b)=>a + b.totalBetCount*b.amount*(b.isDualBet?2:1), 0);
+                return { valid, amt };
+            });
+            const total = stats.reduce((a,b)=>a+b.amt,0);
+            return (
+                <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-in fade-in modal-overlay">
+                    <div className="bg-white w-full h-[80vh] rounded-xl flex flex-col overflow-hidden">
+                        <div className="p-4 border-b flex justify-between items-center bg-slate-50">
+                            <div className="font-bold text-lg">订单校对 <div className="text-xs font-normal text-slate-500 mt-1">{header}</div></div>
+                            <div className="text-indigo-600 font-bold text-xl">¥{total}</div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                            <div className="bg-yellow-50 p-3 rounded text-xs text-slate-600 border border-yellow-100">
+                                <strong>原始记录:</strong><pre className="whitespace-pre-wrap mt-1 font-mono">{originalDisplay}</pre>
+                                {clientTotal && <div className="mt-1 text-orange-600 font-bold">客户手写: {clientTotal}</div>}
+                            </div>
+                            {lines.map((l,i)=>(
+                                <div key={i} className={`flex gap-2 p-2 rounded border ${!stats[i].valid?'border-red-300 bg-red-50':'border-slate-200'}`}>
+                                    <span className="text-slate-400 w-4 pt-2 text-xs">{i+1}</span>
+                                    <textarea 
+                                        value={l} 
+                                        onChange={e=>{const n=[...lines];n[i]=e.target.value;setLines(n)}} 
+                                        className="flex-1 bg-transparent outline-none text-sm resize-none h-auto overflow-hidden"
+                                        rows={1}
+                                        style={{minHeight:'24px'}}
+                                    />
+                                    <div className="text-right">
+                                        <div className="text-xs text-slate-400 font-bold">¥{stats[i].amt}</div>
+                                        <button onClick={()=>{const n=[...lines];n.splice(i,1);setLines(n)}} className="text-red-400 mt-1"><Icon name="X" className="w-4 h-4"/></button>
+                                    </div>
+                                </div>
+                            ))}
+                            <button onClick={()=>setLines([...lines,''])} className="w-full py-3 border-2 border-dashed rounded text-slate-400 font-bold">+ 添加行</button>
+                        </div>
+                        <div className="p-4 border-t flex gap-3">
+                            <button onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold">取消</button>
+                            <button onClick={()=>onSave(batchId, lines.filter(x=>x.trim()))} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow">保存修改</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const RawRecordModal = ({ batch, onClose }) => (
+            <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 modal-overlay">
+                <div className="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl">
+                    <h3 className="font-bold text-lg mb-4 border-b pb-2">原始下单记录</h3>
+                    <div className="bg-slate-100 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto text-slate-700">
+                        <div className="font-bold mb-2 text-slate-900">{batch.header}</div>
+                        {batch.originalTotal && <div className="text-orange-600 font-bold mb-2">手写总计: {batch.originalTotal}</div>}
+                        {/* 优先显示 fullText (完整原始文本) */}
+                        {batch.fullText || batch.lines.join('\n')}
+                    </div>
+                    <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow">关闭</button>
+                </div>
+            </div>
+        );
+
+        const HedgingModal = ({ onClose, riskStats, riskFilter, customers, bets, showAlert }) => {
+            const [activeType, setActiveType] = useState(riskFilter==='HK'?'HK':'MO');
+            const [targetScope, setTargetScope] = useState('ALL');
+            const [selectedCustomer, setSelectedCustomer] = useState(customers[0]?.name||'');
+            const [maxLossLimit, setMaxLossLimit] = useState('0');
+            const [maxBetLimit, setMaxBetLimit] = useState('500');
+            const [copyMsg, setCopyMsg] = useState('');
+
+            const currentRiskStats = useMemo(() => {
+                let filtered = bets.filter(b => !b.isError);
+                if (targetScope === 'CUSTOMER') filtered = filtered.filter(b => b.customerName === selectedCustomer);
+                
+                const stats = { hk:Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0})), mo:Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0})) };
+                let [hkP,hkR,moP,moR] = [0,0,0,0];
+
+                filtered.forEach(b => {
+                    const c = customers.find(cust=>cust.name===b.customerName)||{odds:47.5,rebate:0.1};
+                    const reb = b.totalAmount*c.rebate;
+                    if(b.type==='HK'){hkP+=b.totalAmount;hkR+=reb}else{moP+=b.totalAmount;moR+=reb}
+                    b.numbers.forEach(n=>{if(n>=1&&n<=49){
+                        const t=b.type==='HK'?stats.hk[n-1]:stats.mo[n-1]; t.betAmt+=b.amountPerNumber; t.payout+=b.amountPerNumber*c.odds;
+                    }});
+                });
+                const calc = (l,pool,reb)=>l.map(i=>({...i, customerPL:(i.payout+reb)-pool})).sort((a,b)=>b.betAmt-a.betAmt);
+                return { hk:calc(stats.hk,hkP,hkR), mo:calc(stats.mo,moP,moR), hkPool:hkP, hkRebate:hkR, moPool:moP, moRebate:moR };
+            }, [bets, customers, targetScope, selectedCustomer]);
+
+            const data = activeType === 'HK' ? currentRiskStats.hk : currentRiskStats.mo;
+            const pool = activeType === 'HK' ? currentRiskStats.hkPool : currentRiskStats.moPool;
+            const maxWinForHouse = -Math.min(...data.map(d => d.customerPL));
+            const maxLossForHouse = Math.max(...data.map(d => d.customerPL));
+
+            useEffect(() => { if (maxLossLimit === '0' && maxWinForHouse > 0) setMaxLossLimit((maxWinForHouse * 0.9).toFixed(0)); }, [maxWinForHouse]);
+            
+            // 一键复制建议转出 (v6.13: 格式调整)
+            const copySuggestions = () => {
+                const lines = data
+                    .map(d => {
+                        let advice = 0;
+                        if (d.customerPL > parseFloat(maxLossLimit)) advice = Math.max(advice, (d.customerPL - parseFloat(maxLossLimit))/46.5);
+                        if (d.betAmt > parseFloat(maxBetLimit)) advice = Math.max(advice, d.betAmt - parseFloat(maxBetLimit));
+                        advice = Math.round(advice);
+                        // v6.13: 格式 Number=Amount，用空格分隔
+                        return advice > 0 ? `${d.num}=${advice}` : null;
+                    })
+                    .filter(l => l !== null);
+
+                if (lines.length === 0) {
+                    showAlert("当前没有需要转出的号码", "warning");
+                } else {
+                    const text = lines.join(' '); // 用空格连接
+                    const el = document.createElement('textarea');
+                    el.value = text; document.body.appendChild(el); el.select();
+                    document.execCommand('copy'); document.body.removeChild(el);
+                    setCopyMsg('已复制!'); setTimeout(()=>setCopyMsg(''), 2000);
+                }
+            };
+
+            const filteredData = data.map(d => {
+                let advice = 0;
+                if (d.customerPL > parseFloat(maxLossLimit)) advice = Math.max(advice, (d.customerPL - parseFloat(maxLossLimit))/46.5);
+                if (d.betAmt > parseFloat(maxBetLimit)) advice = Math.max(advice, d.betAmt - parseFloat(maxBetLimit));
+                return { ...d, advice: Math.round(advice) };
+            }).filter(d => d.advice > 0 || d.customerPL > parseFloat(maxLossLimit) || d.betAmt > parseFloat(maxBetLimit));
+
+            return (
+                <div className="fixed inset-0 bg-black/80 z-[200] flex items-end sm:items-center justify-center modal-overlay">
+                    <div className="bg-white w-full sm:w-[600px] h-[95vh] sm:h-[85vh] rounded-t-2xl sm:rounded-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10">
+                        <div className="p-3 bg-slate-100 border-b flex justify-between items-center shrink-0">
+                            <h3 className="font-bold flex items-center gap-2 text-base"><Icon name="Scale" className="w-5 h-5"/> 智能转单</h3>
+                            <button onClick={onClose}><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
+                        </div>
+                        
+                        <div className="bg-blue-50 p-2 text-xs flex justify-between border-b border-blue-100 shrink-0">
+                             <div>
+                                <span className="text-slate-500 mr-1">庄家最高可赢:</span>
+                                <span className="text-green-600 font-bold text-base">+¥{Math.round(maxWinForHouse).toLocaleString()}</span>
+                             </div>
+                             <div className="text-right">
+                                <span className="text-slate-500 mr-1">庄家最大风险:</span>
+                                <span className="text-red-600 font-bold text-base">¥{Math.round(maxLossForHouse).toLocaleString()}</span>
+                             </div>
+                        </div>
+
+                        <div className="p-2 space-y-2 border-b bg-white shrink-0 text-sm">
+                            <div className="flex gap-2 items-center">
+                                <div className="flex-1 flex items-center gap-1">
+                                   <select className="border rounded px-1 py-1.5 bg-white flex-1 text-xs" value={targetScope} onChange={e=>setTargetScope(e.target.value)}><option value="ALL">全部订单</option><option value="CUSTOMER">指定客户</option></select>
+                                   {targetScope==='CUSTOMER' && (<select className="border rounded px-1 py-1.5 bg-white flex-1 text-xs w-24" value={selectedCustomer} onChange={e=>setSelectedCustomer(e.target.value)}>{customers.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select>)}
+                                </div>
+                                <div className="flex border rounded overflow-hidden shrink-0 text-xs">
+                                    <button onClick={()=>setActiveType('MO')} className={`px-2 py-1.5 ${activeType==='MO'?'bg-green-500 text-white':'bg-slate-100 text-slate-600'}`}>澳门</button>
+                                    <button onClick={()=>setActiveType('HK')} className={`px-2 py-1.5 ${activeType==='HK'?'bg-red-500 text-white':'bg-slate-100 text-slate-600'}`}>香港</button>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 items-center bg-slate-50 p-1.5 rounded">
+                                <div className="flex-1 flex items-center gap-1">
+                                    <span className="text-slate-500 text-xs whitespace-nowrap">建议止损:</span>
+                                    <input type="number" value={maxLossLimit} onChange={e=>setMaxLossLimit(e.target.value)} className="w-full border-b border-slate-300 bg-transparent text-center font-bold text-red-600 text-sm p-0 focus:ring-0"/>
+                                </div>
+                                <div className="w-px h-4 bg-slate-300"></div>
+                                <div className="flex-1 flex items-center gap-1">
+                                    <span className="text-slate-500 text-xs whitespace-nowrap">限红:</span>
+                                    <input type="number" value={maxBetLimit} onChange={e=>setMaxBetLimit(e.target.value)} className="w-full border-b border-slate-300 bg-transparent text-center font-bold text-indigo-600 text-sm p-0 focus:ring-0"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-0">
+                             <table className="w-full text-xs text-left relative">
+                                <thead className="bg-slate-100 text-slate-500 sticky top-0 z-10 shadow-sm">
+                                    <tr>
+                                        <th className="p-2 pl-4 w-12">号</th>
+                                        <th className="p-2 text-right text-orange-600 font-bold bg-orange-50">建议转出</th>
+                                        <th className="p-2 text-right">当前下注</th>
+                                        <th className="p-2 pr-4 text-right">风险盈亏</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filteredData.length === 0 ? (
+                                        <tr><td colSpan={4} className="p-10 text-center text-slate-400">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Icon name="Check" className="w-8 h-8 text-green-200"/>
+                                                <span>当前无风险预警</span>
+                                            </div>
+                                        </td></tr>
+                                    ) : (
+                                        filteredData.map((d) => (
+                                            <tr key={d.num} className="active:bg-slate-50 transition-colors">
+                                                <td className="p-2 pl-4 font-bold text-lg font-mono">{d.num}</td>
+                                                <td className="p-2 text-right text-orange-600 font-bold text-lg bg-orange-50/30">¥{d.advice}</td>
+                                                <td className="p-2 text-right text-slate-600">{d.betAmt}</td>
+                                                <td className={`p-2 pr-4 text-right font-bold ${d.customerPL>0?'text-red-600':'text-green-600'}`}>{Math.round(d.customerPL)}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding">
+                            <button onClick={copySuggestions} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                                <Icon name="ClipboardCheck" className="w-5 h-5"/> 
+                                {copyMsg || `复制转单列表 (${filteredData.filter(d=>d.advice>0).length}条)`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 主程序 App ---
+        function App() {
+            const [bets, setBets] = useState(() => { const s = localStorage.getItem('lottery_bets_v5'); return s ? JSON.parse(s) : []; });
+            const [customers, setCustomers] = useState(() => {
+                const s = localStorage.getItem('lottery_customers');
+                if (s) return JSON.parse(s);
+                // v6.13: 默认初始客户
+                return [
+                    {id:'def_1', name:'张三', customerType:'客户', odds:47.5, rebate:0.02, aliases:[]},
+                    {id:'def_2', name:'李四', customerType:'客户', odds:47.5, rebate:0.03, aliases:[]},
+                    {id:'def_3', name:'王五', customerType:'客户', odds:48.0, rebate:0.0, aliases:[]}
+                ];
+            });
+            
+            const [currentYearZodiac, setCurrentYearZodiac] = useState('蛇');
+            const [inputCustomer, setInputCustomer] = useState(''); 
+            const [inputContent, setInputContent] = useState('');
+            const [defaultAmount, setDefaultAmount] = useState('');
+            const [activeTab, setActiveTab] = useState('input'); 
+            const [showSettings, setShowSettings] = useState(false);
+            const [showCustomerModal, setShowCustomerModal] = useState(false); 
+            const [actionSheet, setActionSheet] = useState(null); 
+            const [tempCustomers, setTempCustomers] = useState([]);
+            const [batchToEdit, setBatchToEdit] = useState(null);
+            const [message, setMessage] = useState(null);
+            const [confirmation, setConfirmation] = useState(null);
+            const [showHedgingModal, setShowHedgingModal] = useState(false);
+            
+            // 对账相关
+            const [winningNumberHK, setWinningNumberHK] = useState('');
+            const [winningNumberMO, setWinningNumberMO] = useState('');
+            const [expandedReconciliation, setExpandedReconciliation] = useState(null);
+            const [viewingRawBatch, setViewingRawBatch] = useState(null);
+            const [previewBatches, setPreviewBatches] = useState([]);
+            const [riskFilter, setRiskFilter] = useState('ALL'); 
+
+            const showAlert = (text, type='error') => { setMessage({text,type}); setTimeout(()=>setMessage(null),3000); };
+
+            useEffect(() => { localStorage.setItem('lottery_bets_v5', JSON.stringify(bets)); }, [bets]);
+            useEffect(() => { localStorage.setItem('lottery_year_zodiac', currentYearZodiac); }, [currentYearZodiac]);
+            useEffect(() => { localStorage.setItem('lottery_customers', JSON.stringify(customers)); setTempCustomers(customers); }, [customers]);
+            useEffect(() => {
+                if (showSettings) {
+                    setTempCustomers(customers.map(c => ({ ...c, id: c.id || Math.random().toString(36).substring(2, 9), customerType: c.customerType || '客户'})));
+                }
+            }, [showSettings]);
+
+            const getNumbersForZodiac = (z) => {
+                const idx = ZODIAC_LIST.indexOf(currentYearZodiac);
+                const tIdx = ZODIAC_LIST.indexOf(z);
+                if (idx===-1 || tIdx===-1) return [];
+                const offset = (idx - tIdx + 12) % 12;
+                const nums = [];
+                for (let n = offset+1; n <= 49; n+=12) nums.push(n);
+                return nums;
+            };
+
+            // 解析函数 1
+            const parseContentWithoutAmount = useCallback((text, defaultType) => {
+                let nums = new Set();
+                let count = 0;
+                let type = defaultType;
+                let txt = text.toUpperCase();
+                
+                txt = txt.replace(/[Tt]/g, ' ');
+                txt = txt.replace(/(每个|每|一共|总计)/g, ' 各 '); 
+                txt = txt.replace(/岁数/g, '岁'); 
+                txt = txt.replace(/(\d+)\s*[.,，;；*]+\s*(岁|尾|头)/g, '$1$2');
+                txt = txt.replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g, '$1 $4');
+                txt = txt.replace(/([岁尾头])(\d)/g, '$1 $2'); 
+                
+                // 范围解析: 5到8 -> 5 6 7 8 (在预处理时转换)
+                txt = txt.replace(/(\d+)\s*到\s*(\d+)/g, (match, start, end) => {
+                    const s = parseInt(start);
+                    const e = parseInt(end);
+                    if (s < e && e - s < 49) {
+                        let range = [];
+                        for (let i = s; i <= e; i++) range.push(i);
+                        return range.join(' ');
+                    }
+                    return match;
+                });
+
+                const multiSuffixRegex = /((\d+[\s.,，;；*\/]+)+\d+)\s*[.,，;；*\/]*\s*(岁|尾|头)/g;
+                txt = txt.replace(multiSuffixRegex, (m, p, _, s) => p.split(/[.,，;；*\/]+/).filter((n)=>n.trim()).map((n)=>n.trim()+s).join(' '));
+                txt = txt.replace(new RegExp(`([${ZODIAC_LIST.join('')}])`,'g'), ' $1 ');
+                
+                // v6.13: 强力清洗: 但对非白名单字符要保留以供报警
+                // 策略：不清洗非常规字符，而是让 tokens 遍历时发现它们
+                // 仅清洗常见分隔符
+                let clean = txt.replace(/[.,，;；\/\-*\—–−+。：:]/g, ' ').replace(/[*]/g, ' ');
+                
+                if (new RegExp(PATTERN_HK).test(text)) type = 'HK';
+                else if (new RegExp(PATTERN_MO).test(text)) type = 'MO';
+                
+                // 清洗彩种词
+                clean = clean.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(new RegExp(PATTERN_DUAL_STR,'g'),' ');
+                
+                // 分词
+                const tokens = clean.split(/\s+/).map(t => t.replace(REGEX_AMOUNT_WITH_SLASH, '').trim()).filter(t => t && !t.includes('(XXF)') && !t.match(/^\d{11}$/));
+                
+                tokens.forEach(t => {
+                    // v6.13: 尝试强力提取数字 (针对 "冂1" "03." 等情况)
+                    let n = parseInt(t);
+                    let extracted = false;
+                    let hasUnknown = false;
+                    
+                    if (isNaN(n)) {
+                        // 尝试提取纯数字
+                        const match = t.match(/^(\d+)/); // 仅匹配开头的数字，避免误配
+                        if (match) {
+                            n = parseInt(match[1]);
+                            extracted = true; // 标记为强行提取
+                            hasUnknown = true; // 标记包含乱码
+                        } else {
+                            // 彻底无法识别，且不是关键词
+                            if (!KEYWORDS[t] && !ZODIAC_LIST.includes(t) && !t.endsWith('岁') && !t.endsWith('尾') && !t.endsWith('头')) {
+                                hasUnknown = true;
+                            }
+                        }
+                    }
+
+                    if (!isNaN(n) && n>=1 && n<=49 && !t.endsWith('岁') && !t.endsWith('尾') && !t.endsWith('头')) { 
+                        nums.add(n); count++; 
+                        return; 
+                    }
+                    if (KEYWORDS[t]) { KEYWORDS[t].forEach(x=>nums.add(x)); count+=KEYWORDS[t].length; return; }
+                    if (ZODIAC_LIST.includes(t)) { getNumbersForZodiac(t).forEach(x=>nums.add(x)); count+=getNumbersForZodiac(t).length; return; }
+                    if (t.endsWith('岁')) { const age = parseInt(t.replace('岁','')); if (!isNaN(age)) { let temp=age; while(temp<=49){if(temp>0){nums.add(temp);count++;} temp+=12;} } return; }
+                    if (t.endsWith('尾') || t.endsWith('头')) {
+                        const val = parseInt(t.slice(0,-1));
+                        if(!isNaN(val)) {
+                            const isTail = t.endsWith('尾');
+                            for(let i=0; i<=49; i++) { if(i===0) continue; if((isTail && i%10===val) || (!isTail && Math.floor(i/10)===val)) { nums.add(i); count++; } }
+                        }
+                    }
+                });
+                return { numbers: Array.from(nums).sort((a,b)=>a-b), totalBetCount: count, type };
+            }, [currentYearZodiac]);
+
+            const parseContentForSegments = useCallback((text, defaultAmtStr) => {
+                let clientTotal = '';
+                const contentWithoutTotal = text.replace(REGEX_CLIENT_TOTAL, (match) => { clientTotal = match; return ''; }).trim();
+                if (!contentWithoutTotal) return [];
+                const defAmt = parseFloat(defaultAmtStr) || 0;
+                const segments = [];
+                const lines = contentWithoutTotal.split(/[\n]/).filter(l => l.trim());
+                let currType = 'MO';
+
+                lines.forEach(line => {
+                    if (REGEX_CHAT_HEADER.test(line)) return;
+                    const isOnlyType = (new RegExp(`^(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?$`).test(line.trim()));
+                    if (new RegExp(PATTERN_HK).test(line)) currType = 'HK';
+                    else if (new RegExp(PATTERN_MO).test(line)) currType = 'MO';
+                    else if (/奥|门/.test(line)) currType = 'MO';
+
+                    const isDual = REGEX_DUAL.test(line);
+                    const hasExplicitKeyword = /(各|买|=|每|号)/.test(line); // "号" is explicit now
+                    const regex = hasExplicitKeyword ? REGEX_AMOUNT_NO_SLASH : REGEX_AMOUNT_WITH_SLASH;
+                    
+                    // v6.11: 处理逗号分隔的混合模式
+                    let preprocessedLine = line;
+                    preprocessedLine = preprocessedLine.replace(/(\d+\s*[/]\s*\d+)\s*[，,;；]\s*/g, '$1\n');
+
+                    let splitParts = [preprocessedLine];
+                    if (preprocessedLine.includes('\n')) {
+                         splitParts = preprocessedLine.split('\n');
+                    } else if (preprocessedLine.includes('另外')) {
+                        splitParts = preprocessedLine.split('另外');
+                    }
+
+                    splitParts.forEach(subLine => {
+                        if(!subLine.trim()) return;
+                         const matches = Array.from(subLine.matchAll(regex));
+
+                        if (matches.length === 0) {
+                            const res = parseContentWithoutAmount(subLine, currType);
+                            if (isOnlyType) return;
+
+                            if (res.totalBetCount === 0) return; 
+
+                            const hasUnit = /[元米斤块]/.test(subLine);
+                            // v6.13: 如果有未知字符，标记为 suspicious
+                            const isSus = (res.totalBetCount > 1 && defAmt === 0 && !hasUnit) || res.hasUnknown;
+                            if (res.totalBetCount > 0 || subLine.trim().length > 0) {
+                                segments.push({
+                                    numbers: res.numbers, totalBetCount: res.totalBetCount, amount: defAmt,
+                                    content: subLine, type: res.type, isDualBet: isDual, isValid: res.totalBetCount > 0 && defAmt > 0, 
+                                    rawLine: subLine, isSuspicious: isSus,
+                                    fullLine: line 
+                                });
+                            }
+                            return;
+                        }
+                        
+                        let cursor = 0;
+                        matches.forEach(m => {
+                            const amtTxt = m[0];
+                            const idx = m.index;
+                            let content = subLine.substring(cursor, idx).trim();
+                            content = content.replace(/^[.,，;；、\/\-*\—–−。：:+]+/, '');
+                            let amt = 0;
+                            const numM = amtTxt.match(/(\d+(\.\d+)?)/);
+                            if (numM) amt = parseFloat(numM[0]);
+                            else {
+                                const chM = amtTxt.match(new RegExp(`[${CH_NUM}]+`));
+                                if (chM) { const v = parseChineseNumber(chM[0]); if (!isNaN(v)) amt = v; }
+                            }
+                            if (content.length > 0) {
+                                const res = parseContentWithoutAmount(content, currType);
+                                let isSus = false;
+                                if (res.totalBetCount > 1) { if (!/[各xX\/元米斤块=每号]/.test(amtTxt)) isSus = true; }
+                                // v6.13: 继承 hasUnknown
+                                if (res.hasUnknown) isSus = true;
+                                
+                                if (res.totalBetCount > 0) {
+                                    segments.push({
+                                        numbers: res.numbers, totalBetCount: res.totalBetCount, amount: amt,
+                                        content: content, type: res.type, isDualBet: isDual || REGEX_DUAL.test(content),
+                                        isValid: amt > 0, rawLine: content + amtTxt, isSuspicious: isSus,
+                                        fullLine: line 
+                                    });
+                                }
+                            }
+                            cursor = idx + amtTxt.length;
+                        });
+                        let trail = subLine.substring(cursor).trim().replace(/^[.,，;；、\/\-*\—–−。：:+]+/, '');
+                        if (trail.length > 0) {
+                            const res = parseContentWithoutAmount(trail, currType);
+                            if (res.totalBetCount > 0) { 
+                                segments.push({ 
+                                    numbers: res.numbers, totalBetCount: res.totalBetCount, amount: defAmt, 
+                                    content: trail, type: res.type, isDualBet: isDual || REGEX_DUAL.test(trail), 
+                                    isValid: res.totalBetCount > 0 && defAmt > 0, rawLine: trail, 
+                                    isSuspicious: defAmt === 0 || res.hasUnknown, // v6.13
+                                    fullLine: line
+                                }); 
+                            }
+                        }
+                    });
+                });
+                
+                if (segments.length > 0) {
+                    if (clientTotal) segments[0].clientTotal = clientTotal;
+                    if (contentWithoutTotal) segments[0].fullText = contentWithoutTotal;
+                }
+                
+                return segments;
+            }, [parseContentWithoutAmount, currentYearZodiac]);
+
+            useEffect(() => {
+                const txt = inputContent.trim();
+                if (!txt) { setPreviewBatches([]); return; }
+                const blocks = [];
+                let curHead = '', curLines = [];
+                txt.split('\n').forEach(l => {
+                    const isH = /[:：]\s*$/.test(l) && !new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})[:：]`).test(l);
+                    if (isH) { if(curLines.length) blocks.push({header: curHead, text: curLines.join('\n')}); curHead=l.trim(); curLines=[]; }
+                    else if (l.trim()) curLines.push(l);
+                });
+                if (curLines.length) {
+                    if (!curHead && blocks.length === 0) blocks.push({header: '', text: curLines.join('\n')});
+                    else blocks.push({header: curHead, text: curLines.join('\n')});
+                }
+                const previews = blocks.map(b => ({
+                    header: b.header,
+                    segments: parseContentForSegments(b.text, defaultAmount).filter(s => s.totalBetCount > 0), 
+                })).filter(p => p.segments.length > 0);
+                setPreviewBatches(previews);
+            }, [inputContent, defaultAmount, parseContentForSegments]);
+
+            const handleAddBet = (e) => {
+                e.preventDefault();
+                if (!inputCustomer) { showAlert("请先选择客户", "warning"); return; }
+                
+                const targetName = inputCustomer.trim();
+                if (!customers.find(c => c.name === targetName)) { showAlert("客户不存在，请先在客户管理中添加", "error"); return; }
+                
+                const newBets = [];
+                let total = 0;
+                previewBatches.forEach((batch, idx) => {
+                    const batchId = (Date.now() + idx).toString(36) + Math.random().toString(36).substr(2, 5);
+                    const ts = Date.now() + idx;
+                    let cust = targetName; 
+                    
+                    batch.segments.forEach((seg) => {
+                        const types = seg.isDualBet ? ['HK', 'MO'] : [seg.type];
+                        const isErr = !seg.isValid || seg.isSuspicious;
+                        types.forEach((t) => {
+                            const amt = isErr ? 0 : seg.amount;
+                            newBets.push({
+                                id: batchId + '-' + t + Math.random().toString(36).substr(2,5),
+                                batchId, customerName: cust, type: t, numbers: seg.numbers,
+                                totalBetCount: seg.totalBetCount, amountPerNumber: seg.amount,
+                                totalAmount: seg.totalBetCount * amt, timestamp: ts,
+                                rawInput: seg.rawLine, formattedContent: seg.rawLine, originalHeader: batch.header,
+                                isError: isErr, originalTotal: seg.clientTotal || '',
+                                fullText: seg.fullText || ''
+                            });
+                            total += seg.totalBetCount * amt;
+                        });
+                    });
+                });
+                setBets(prev => [...prev, ...newBets]);
+                let msg = `成功提交！共 ¥${total}`;
+                showAlert(msg, 'success');
+                setInputContent(''); setActiveTab('customers');
+            };
+
+            // --- 清空功能 ---
+            const handleClearClick = () => {
+                const target = inputCustomer.trim();
+                setActionSheet({
+                    title: "数据管理",
+                    actions: [
+                        { 
+                            text: target ? `🗑️ 清空 [${target}]` : "请先选择客户", 
+                            className: target ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-200" : "bg-gray-100 text-gray-400 cursor-not-allowed", 
+                            onClick: () => {
+                                if (!target) return;
+                                setActionSheet(null); 
+                                setTimeout(() => {
+                                    if(confirm(`确定仅删除 ${target} 的记录吗？`)) {
+                                        setBets(prev => prev.filter(b => b.customerName !== target));
+                                        showAlert(`已清空 ${target} 的记录`, 'success');
+                                    }
+                                }, 100);
+                            }
+                        },
+                        { 
+                            text: "⚠️ 清空所有数据", 
+                            className: "bg-red-100 text-red-700 hover:bg-red-200", 
+                            onClick: () => {
+                                setActionSheet(null);
+                                setTimeout(() => {
+                                    setBets([]); 
+                                    localStorage.removeItem('lottery_bets_v5'); 
+                                    showAlert('系统已重置', 'success');
+                                }, 50);
+                            }
+                        }
+                    ],
+                    onCancel: () => setActionSheet(null)
+                });
+            };
+            
+            // 客户选择回调
+            const handleSelectCustomer = (name) => {
+                setInputCustomer(name);
+                setShowCustomerModal(false);
+                showAlert(`已切换到客户: ${name}`, 'success');
+            };
+
+            const handleDeleteBatch = (bid) => { if(confirm('确定删除?')) setBets(bets.filter(b=>b.batchId!==bid)); };
+            const handleUpdateCustomerField = (id, k, v) => setTempCustomers(prev=>prev.map(c=>c.id===id?{...c,[k]:v}:c));
+            const handleAddCustomerRow = () => setTempCustomers([...tempCustomers, { id: Math.random().toString(), name: '', customerType: '客户', odds: 47.5, rebate: 0.05, aliases: [] }]);
+            const handleDeleteCustomerRow = (id, name) => { if(!name) setTempCustomers(tempCustomers.filter(c => c.id !== id)); };
+            const handleSaveCustomers = () => { setCustomers(tempCustomers); setShowSettings(false); };
+            
+            const customerStats = useMemo(() => {
+                const grouped = {}, batches = {};
+                bets.forEach(b => {
+                    if (!batches[b.batchId]) {
+                        batches[b.batchId] = { 
+                            batchId: b.batchId, customerName: b.customerName, total: 0, header: b.originalHeader, 
+                            timestamp: b.timestamp, records: [], originalTotal: b.originalTotal || '', fullText: b.fullText
+                        };
+                    }
+                    const segments = parseContentForSegments(b.rawInput || '', '0', currentYearZodiac);
+                    const isCurrentValid = segments.length > 0 && segments.every(s => s.isValid && !s.isSuspicious);
+                    if (isCurrentValid && b.isError === true) {
+                         b.isError = false; 
+                         b.totalAmount = segments.reduce((acc, seg) => acc + seg.totalBetCount * seg.amount * (seg.isDualBet ? 2 : 1), 0);
+                    }
+                    batches[b.batchId].total += b.totalAmount;
+                    batches[b.batchId].records.push(b);
+                });
+                Object.values(batches).forEach(b => {
+                    if (!grouped[b.customerName]) grouped[b.customerName] = { total: 0, batches: [] };
+                    grouped[b.customerName].total += b.total;
+                    grouped[b.customerName].batches.push(b);
+                });
+                return Object.entries(grouped).map(([name, d]) => ({
+                    name, total: d.total, batches: d.batches.sort((a,b) => a.timestamp - b.timestamp)
+                }));
+            }, [bets, parseContentForSegments]);
+
+            const handleSaveEditedBatch = (batchId, lines) => {
+                const batchIndices = bets.map((b, i) => b.batchId === batchId ? i : -1).filter(i => i !== -1);
+                if(batchIndices.length === 0) return;
+                const firstIndex = batchIndices[0];
+                const oldBatch = bets[firstIndex];
+                const newRecs = [];
+                const segments = parseContentForSegments(lines.join('\n'), '0');
+                let clientTotal = segments[0]?.clientTotal || '';
+                let fullText = oldBatch.fullText; 
+                segments.forEach(s => {
+                    const types = s.isDualBet ? ['HK', 'MO'] : [s.type];
+                    types.forEach(t => {
+                        const isErr = !s.isValid || s.isSuspicious;
+                        newRecs.push({
+                            id: batchId + Math.random(), batchId, customerName: oldBatch.customerName, type: t, numbers: s.numbers,
+                            totalBetCount: s.totalBetCount, amountPerNumber: s.amount, totalAmount: s.totalBetCount * (isErr ? 0 : s.amount),
+                            timestamp: oldBatch.timestamp, rawInput: s.rawLine, formattedContent: s.rawLine, originalHeader: oldBatch.originalHeader, isError: isErr,
+                            originalTotal: clientTotal, fullText 
+                        })
+                    })
+                });
+                const betsBefore = bets.slice(0, firstIndex);
+                const betsAfter = bets.slice(firstIndex).filter(b => b.batchId !== batchId);
+                setBets([...betsBefore, ...newRecs, ...betsAfter]);
+                setBatchToEdit(null);
+                showAlert('修改保存成功');
+            };
+
+            const riskStats = useMemo(() => {
+                const hk = Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0}));
+                const mo = Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0}));
+                let [tpH, trH, tpM, trM] = [0,0,0,0];
+                bets.forEach(b => {
+                    if (b.isError) return;
+                    const cust = customers.find(c => c.name === b.customerName) || {odds:47.5, rebate:0.1};
+                    const rebate = b.totalAmount * cust.rebate;
+                    if (b.type==='HK') { tpH+=b.totalAmount; trH+=rebate; } else { tpM+=b.totalAmount; trM+=rebate; }
+                    b.numbers.forEach(n => {
+                        if (n>=1 && n<=49) {
+                            const t = b.type==='HK'?hk[n-1]:mo[n-1];
+                            t.betAmt += b.amountPerNumber;
+                            t.payout += b.amountPerNumber * cust.odds;
+                        }
+                    });
+                });
+                const calc = (l, pool, reb) => l.map(i => ({...i, customerPL: (i.payout+reb)-pool})).sort((a,b)=>b.betAmt-a.betAmt);
+                return { hk: calc(hk,tpH,trH), mo: calc(mo,tpM,trM), hkPool:tpH, hkRebate:trH, moPool:tpM, moRebate:trM };
+            }, [bets, customers]);
+
+            const reconciliationStats = useMemo(() => {
+                const [wh, wm] = [parseInt(winningNumberHK), parseInt(winningNumberMO)];
+                const stats = [];
+                customers.forEach(cust => {
+                    const custBets = bets.filter(b => b.customerName === cust.name && !b.isError);
+                    let total = 0, winHK = 0, winMO = 0;
+                    const tBatch = {}, processed = new Set();
+                    const sorted = custBets.sort((a,b) => a.timestamp - b.timestamp);
+                    sorted.forEach(b => {
+                        if(!tBatch[b.batchId]) { tBatch[b.batchId]={total:0, winHK:0, winMO:0, header:b.originalHeader||'', lines:new Set(), originalTotal: b.originalTotal || '', fullText: b.fullText}; processed.add(b.batchId); }
+                        tBatch[b.batchId].total += b.totalAmount;
+                        tBatch[b.batchId].lines.add(b.rawInput||'');
+                        total += b.totalAmount;
+                        if (b.type==='HK' && !isNaN(wh) && b.numbers.includes(wh)) { tBatch[b.batchId].winHK += b.amountPerNumber; winHK += b.amountPerNumber; }
+                        if (b.type==='MO' && !isNaN(wm) && b.numbers.includes(wm)) { tBatch[b.batchId].winMO += b.amountPerNumber; winMO += b.amountPerNumber; }
+                    });
+                    const details = [];
+                    let idx = 1;
+                    const sortedIds = Array.from(processed).sort((a,b) => {
+                        const tA = bets.find(x=>x.batchId===a)?.timestamp||0;
+                        const tB = bets.find(x=>x.batchId===b)?.timestamp||0;
+                        return tA - tB;
+                    });
+                    sortedIds.forEach((bid) => {
+                        const i = tBatch[bid];
+                        if(i.total>0) details.push({idx:idx++, total:i.total, winHK:i.winHK, winMO:i.winMO, header:i.header, lines:Array.from(i.lines), originalTotal: i.originalTotal, fullText: i.fullText});
+                    });
+                    const winTotal = winHK + winMO;
+                    if (total > 0) {
+                        stats.push({
+                            name: cust.name, totalStake: total, winningStakeTotal: winTotal, 
+                            profit: (winTotal * cust.odds + total * cust.rebate) - total,
+                            rebateAmt: total * cust.rebate, winAmt: winTotal * cust.odds, batchDetails: details
+                        });
+                    }
+                });
+                return stats.sort((a, b) => b.totalStake - a.totalStake);
+            }, [bets, customers, winningNumberHK, winningNumberMO]);
+
+            const copyRec = (stat) => {
+                const dt = stat.batchDetails.map(b => {
+                    const w = b.winHK+b.winMO;
+                    let lbl = '';
+                    if(w>0) {
+                        if(b.winHK>0 && b.winMO>0) lbl=` [中: ¥${w} (港${b.winHK}+澳${b.winMO})]`;
+                        else if(b.winHK>0) lbl=` [中: ¥${w} (港)]`;
+                        else lbl=` [中: ¥${w} (澳)]`;
+                    }
+                    return `(${b.idx})合计: ${b.total}${lbl}`;
+                }).join('\n');
+                const txt = `【${stat.name}】对账\n----------------\n开奖: 港[${winningNumberHK||'-'}] 澳[${winningNumberMO||'-'}]\n----------------\n本期总投: ¥${stat.totalStake}\n中特本金: ¥${stat.winningStakeTotal}\n退水: ¥${stat.rebateAmt.toFixed(1)}\n----------------\n盈亏: ${stat.profit>=0?'+':''}${stat.profit.toFixed(1)}\n----------------\n${dt}`;
+                const el = document.createElement('textarea');
+                el.value = txt; document.body.appendChild(el); el.select();
+                document.execCommand('copy'); document.body.removeChild(el);
+                showAlert('已复制', 'success');
+            }
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen pb-24">
+                    {/* 顶部 Header */}
+                    <div className="bg-indigo-600 text-white p-4 sticky top-0 z-50 shadow-lg flex justify-between items-center">
+                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.13</div>
+                        <button onClick={()=>setShowSettings(true)} className="bg-indigo-500 px-3 py-1 rounded text-sm font-bold hover:bg-indigo-400">客户管理</button>
+                    </div>
+                    {message && (<div className={`fixed top-16 left-4 right-4 p-3 rounded-lg shadow-xl text-white z-[60] text-center ${message.type==='error'?'bg-red-500':'bg-green-500'} animate-bounce`}>{message.text}</div>)}
+                    
+                    <div className="p-4">
+                        {activeTab === 'input' && (
+                            <div className="space-y-4">
+                                <div className="bg-white p-4 rounded-xl shadow border border-indigo-100">
+                                    <h3 className="font-bold text-indigo-800 mb-2 flex items-center gap-2">快速录入</h3>
+                                    
+                                    {/* 客户选择区域 */}
+                                    <div className="flex gap-2 mb-2">
+                                        <div 
+                                            className="flex-1 border p-3 rounded-lg bg-slate-50 text-slate-700 font-bold flex items-center justify-between cursor-pointer hover:bg-slate-100 active:bg-slate-200 transition-colors shadow-sm" 
+                                            onClick={() => setShowCustomerModal(true)}
+                                        >
+                                            {inputCustomer ? (
+                                                <span className="text-lg text-indigo-700">{inputCustomer}</span>
+                                            ) : (
+                                                <span className="text-gray-400 font-normal">请选择客户...</span>
+                                            )}
+                                            <Icon name="ChevronDown" className="w-5 h-5 text-slate-400"/>
+                                        </div>
+                                        <button onClick={() => setShowCustomerModal(true)} className="bg-indigo-500 text-white px-4 rounded-lg font-bold text-sm whitespace-nowrap shadow-md active:scale-95 transition-transform flex items-center gap-1">
+                                            <Icon name="User" className="w-4 h-4"/> 选择
+                                        </button>
+                                    </div>
+
+                                    {/* 空状态提示 (当没有选择客户时显示) */}
+                                    {!inputCustomer && (
+                                        <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg text-sm text-center mb-2 leading-relaxed shadow-sm">
+                                            <div className="font-bold text-lg mb-2">👋 欢迎使用</div>
+                                            {customers.length === 0 ? (
+                                                <>
+                                                    <p>您还没有添加任何客户。</p>
+                                                    <p>请先点击右上角 <strong>[客户管理]</strong> 添加客户。</p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p>暂未选择客户，无法录入注单。</p>
+                                                    <p>请点击上方 <strong>[选择]</strong> 按钮指定当前客户。</p>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <textarea 
+                                        value={inputContent} 
+                                        onChange={e=>setInputContent(e.target.value)} 
+                                        disabled={!inputCustomer}
+                                        className={`w-full p-3 border rounded-lg h-40 font-mono text-sm mb-2 focus:ring-2 focus:ring-indigo-200 outline-none transition-colors ${!inputCustomer ? 'bg-gray-100 cursor-not-allowed' : 'bg-slate-50'}`}
+                                        placeholder={!inputCustomer ? "请先选择客户..." : "粘贴注单内容..."}
+                                    ></textarea>
+                                    
+                                    {previewBatches.length>0 && (
+                                        <div className="bg-slate-100 p-2 rounded mb-2 max-h-32 overflow-y-auto text-xs">
+                                            {previewBatches.map((b,i) => (<div key={i} className="mb-1 pb-1 border-b border-slate-200 last:border-0"><div className="font-bold text-slate-500">{b.header}</div>{b.segments.map((s,j) => <div key={j} className={!s.isValid||s.isSuspicious?'text-red-500 font-bold animate-pulse-slow border border-red-300 bg-red-50 p-1 rounded':''}>{s.rawLine}</div>)}</div>))}
+                                        </div>
+                                    )}
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={handleAddBet} 
+                                            disabled={!inputCustomer}
+                                            className={`flex-1 text-white py-3 rounded-lg font-bold shadow-lg active:scale-95 transition-transform flex items-center justify-center ${!inputCustomer ? 'bg-gray-400' : 'bg-indigo-600'}`}
+                                        >
+                                            <Icon name="Send" className="inline w-4 h-4 mr-1"/> 提交
+                                        </button>
+                                        <button onClick={()=>setInputContent('')} className="px-4 border rounded-lg bg-white text-slate-500"><Icon name="Eraser" className="w-5 h-5"/></button>
+                                        <button onClick={handleClearClick} className="px-4 border border-red-200 bg-white text-red-500 rounded-lg"><Icon name="Trash2" className="w-5 h-5"/></button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {/* Customers Tab */}
+                        {activeTab === 'customers' && (
+                            <div className="space-y-4 pb-20">
+                                {customerStats.map(cust => (
+                                    <details key={cust.name} open className="bg-white border rounded-xl shadow-sm overflow-hidden group">
+                                        <summary className="flex justify-between items-center p-4 cursor-pointer bg-slate-50 group-open:bg-indigo-50 transition-colors">
+                                            <div className="font-bold text-lg text-slate-800">{cust.name}</div>
+                                            <div className="font-bold text-indigo-600 text-xl">¥{cust.total}</div>
+                                        </summary>
+                                        <div className="p-3 space-y-3 bg-white">
+                                            {cust.batches.map((batch, i) => {
+                                                const isBatchError = batch.records.some(r => r.isError);
+                                                return (
+                                                    <div key={batch.batchId} className={`border rounded-lg p-3 ${isBatchError?'bg-red-100 border-red-400 ring-2 ring-red-300 animate-pulse-slow':'bg-slate-50 border-slate-200'}`}>
+                                                        <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200/50">
+                                                            <span className={`font-bold text-sm ${isBatchError?'text-red-800':'text-indigo-700'}`}>#{i+1} 笔: ¥{batch.total}</span>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={()=>setBatchToEdit(batch.batchId)} className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold border border-yellow-200">修改</button>
+                                                                <button onClick={()=>{if(confirm('删?'))setBets(bets.filter(b=>b.batchId!==batch.batchId))}} className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold border border-red-200">删</button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-xs font-mono text-slate-600 space-y-1">
+                                                            {batch.records.map((r,ri) => (<div key={ri} className="flex justify-between"><span className={r.isError?'text-red-600 font-bold':''}>{r.rawInput}</span><span className="text-slate-400">{r.isError?'(待核对)':`¥${r.totalAmount}`}</span></div>))}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </details>
+                                ))}
+                            </div>
+                        )}
+                        {/* Risk Tab */}
+                        {activeTab === 'risk' && (
+                            <div className="h-[calc(100vh-140px)] flex flex-col">
+                                <div className="flex justify-between mb-2">
+                                    <div className="flex bg-white rounded border p-1 text-xs font-bold">
+                                        <button onClick={()=>setRiskFilter('MO')} className={`px-3 py-1 rounded ${riskFilter==='MO'?'bg-green-500 text-white':''}`}>澳</button>
+                                        <button onClick={()=>setRiskFilter('HK')} className={`px-3 py-1 rounded ${riskFilter==='HK'?'bg-red-500 text-white':''}`}>港</button>
+                                        <button onClick={()=>setRiskFilter('ALL')} className={`px-3 py-1 rounded ${riskFilter==='ALL'?'bg-indigo-500 text-white':''}`}>全</button>
+                                    </div>
+                                    <button onClick={()=>setShowHedgingModal(true)} className="bg-orange-500 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-1"><Icon name="Scale" className="w-4 h-4"/> 智能吃码</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto grid grid-cols-2 gap-2 pb-24">
+                                     {(riskFilter==='ALL'||riskFilter==='MO') && <MobileRiskTable title="🇲🇴 澳门" color="green" data={riskStats.mo} total={riskStats.moPool} />}
+                                     {(riskFilter==='ALL'||riskFilter==='HK') && <MobileRiskTable title="🇭🇰 香港" color="red" data={riskStats.hk} total={riskStats.hkPool} />}
+                                </div>
+                            </div>
+                        )}
+                        {/* Reconciliation Tab */}
+                        {activeTab === 'reconciliation' && (
+                            <div className="pb-24">
+                                <div className="bg-white p-4 rounded-xl shadow mb-4 sticky top-0 z-10">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><div className="text-xs text-green-600 font-bold text-center mb-1">🇲🇴 澳门开奖</div><input type="number" value={winningNumberMO} onChange={e=>setWinningNumberMO(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-green-100 rounded-lg py-2 text-green-600"/></div>
+                                        <div><div className="text-xs text-red-600 font-bold text-center mb-1">🇭🇰 香港开奖</div><input type="number" value={winningNumberHK} onChange={e=>setWinningNumberHK(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-red-100 rounded-lg py-2 text-red-600"/></div>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {reconciliationStats.length === 0 ? <div className="text-center text-slate-400 py-10">暂无注单数据，请先录入</div> : reconciliationStats.map(s => (
+                                        <div key={s.name} className="bg-white rounded-lg shadow p-3" onClick={()=>setExpandedReconciliation(expandedReconciliation===s.name?null:s.name)}>
+                                            <div className="flex justify-between items-center border-b pb-2 mb-2">
+                                                <div className="font-bold text-lg">{s.name}</div>
+                                                <div className={`font-bold text-xl ${s.profit>=0?'text-red-600':'text-green-600'}`}>{s.profit>=0?'+':''}{s.profit.toFixed(0)}</div>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2 text-xs text-center mb-2">
+                                                <div className="bg-slate-50 p-1 rounded">流水: {s.totalStake}</div>
+                                                <div className="bg-slate-50 p-1 rounded text-indigo-600 font-bold">中特: {s.winningStakeTotal}</div>
+                                                <div className="bg-slate-50 p-1 rounded">退水: {s.rebateAmt.toFixed(0)}</div>
+                                            </div>
+                                            {expandedReconciliation===s.name && (
+                                                <div className="bg-slate-50 p-2 rounded text-xs font-mono mt-2 space-y-1 max-h-96 overflow-y-auto">
+                                                    <div className="flex flex-col gap-2"> {/* 单列模式 */}
+                                                        {s.batchDetails.map(b => {
+                                                            const winTot = b.winHK+b.winMO;
+                                                            let winLbl = '';
+                                                            if(winTot>0) {
+                                                                if(b.winHK>0 && b.winMO>0) winLbl=`[中: ¥${winTot} (港${b.winHK}+澳${b.winMO})]`;
+                                                                else if(b.winHK>0) winLbl=`[中: ¥${winTot} (港)]`;
+                                                                else winLbl=`[中: ¥${winTot} (澳)]`;
+                                                            }
+                                                            return (
+                                                                <div key={b.idx} className="flex flex-wrap justify-start items-center border-b border-slate-200 last:border-0 pb-2 pt-1 gap-4" onClick={(e)=>{e.stopPropagation();setViewingRawBatch(b)}}>
+                                                                    <span className="font-bold text-slate-700 text-sm whitespace-nowrap">({b.idx}) 合计: {b.total}</span>
+                                                                    {winTot>0 && <span className="text-red-600 font-bold text-sm">{winLbl}</span>}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <button onClick={(e)=>{e.stopPropagation(); copyRec(s);}} className="w-full mt-4 bg-indigo-600 text-white py-2 rounded font-bold">复制详单</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* 底部导航栏 */}
+                    <div id="bottom-nav" className="bg-white border-t grid grid-cols-4 py-2 shadow-lg text-xs pb-safe">
+                        <button onClick={()=>setActiveTab('reconciliation')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='reconciliation'?'text-indigo-600 font-bold':'text-slate-400'}`}><Icon name="ClipboardCheck" className="w-6 h-6"/>对账</button>
+                        <button onClick={()=>setActiveTab('input')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='input'?'text-indigo-600 font-bold':'text-slate-400'}`}><Icon name="Zap" className="w-6 h-6"/>录入</button>
+                        <button onClick={()=>setActiveTab('customers')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='customers'?'text-indigo-600 font-bold':'text-slate-400'}`}><Icon name="BookOpen" className="w-6 h-6"/>账本</button>
+                        <button onClick={()=>setActiveTab('risk')} className={`flex-1 flex flex-col items-center gap-1 p-2 ${activeTab==='risk'?'text-indigo-600 font-bold':'text-slate-400'}`}><Icon name="ShieldAlert" className="w-6 h-6"/>风控</button>
+                    </div>
+                    
+                    {/* 模态框区域 */}
+                    {showCustomerModal && (
+                        <CustomerSelectModal 
+                            customers={customers} 
+                            onSelect={handleSelectCustomer} 
+                            onClose={() => setShowCustomerModal(false)} 
+                        />
+                    )}
+                    {actionSheet && (
+                        <ActionSheet 
+                            title={actionSheet.title}
+                            actions={actionSheet.actions}
+                            onCancel={actionSheet.onCancel}
+                        />
+                    )}
+                    {showSettings && (
+                        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 modal-overlay">
+                            <div className="bg-white w-full max-w-lg rounded-xl p-4 max-h-[80vh] overflow-y-auto">
+                                <div className="flex justify-between items-center mb-4 pb-2 border-b">
+                                    <h3 className="font-bold text-lg">客户管理</h3>
+                                    <button onClick={()=>setShowSettings(false)}><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
+                                </div>
+                                <div className="space-y-2">
+                                    {tempCustomers.map(c => (
+                                        <div key={c.id} className="flex gap-2 items-center">
+                                            <input value={c.name} onChange={e=>handleUpdateCustomerField(c.id,'name',e.target.value)} className="border p-2 rounded w-24 text-sm" placeholder="姓名"/>
+                                            <input type="number" value={isNaN(c.odds)?'':c.odds} onChange={e=>handleUpdateCustomerField(c.id,'odds',parseFloat(e.target.value)||0)} className="border p-2 rounded w-16 text-sm" placeholder="赔率"/>
+                                            <input type="number" value={isNaN(c.rebate)?'':c.rebate*100} onChange={e=>handleUpdateCustomerField(c.id,'rebate',(parseFloat(e.target.value)||0)/100)} className="border p-2 rounded w-16 text-sm" placeholder="退水%"/>
+                                            <button onClick={()=>setTempCustomers(prev=>prev.filter(x=>x.id!==c.id))}><Icon name="Trash2" className="w-5 h-5 text-red-500"/></button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-4 flex gap-2">
+                                    <button onClick={()=>setTempCustomers([...tempCustomers, {id:Math.random().toString(),name:'',customerType:'客户',odds:47.5,rebate:0.1,aliases:[]}])} className="flex-1 bg-green-500 text-white py-2 rounded font-bold">新增客户</button>
+                                    <button onClick={handleSaveCustomers} className="flex-1 bg-blue-500 text-white py-2 rounded font-bold">保存设置</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {batchToEdit && <EditOrderModal batchId={batchToEdit} onClose={()=>setBatchToEdit(null)} onSave={handleSaveEditedBatch} bets={bets} parseContentForSegments={(t,a)=>parseContentForSegments(t,a,currentYearZodiac)} />}
+                    {viewingRawBatch && <RawRecordModal batch={viewingRawBatch} onClose={()=>setViewingRawBatch(null)} />}
+                    {showHedgingModal && <HedgingModal onClose={()=>setShowHedgingModal(false)} riskStats={riskStats} riskFilter={riskFilter} customers={customers} bets={bets} showAlert={showAlert} />}
+                    <ConfirmationModal confirmation={confirmation} />
+                </div>
+            );
+        }
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
