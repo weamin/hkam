@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>彩票风控系统 v6.13</title>
+    <title>彩票风控系统 v6.15</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -96,7 +96,6 @@
         const CH_NUM = "零一二三四五六七八九十百千两";
         const UNITS = "元米斤块";
 
-        // 增强版金额正则
         const BASE_AMOUNT_PARTS = [
             `((各|买|x|X|号|=|每)\\s*\\d+(\\.\\d+)?\\s*[.,]*\\s*[${UNITS}]?)`, 
             `(\\d+(\\.\\d+)?\\s*[.,]*\\s*[${UNITS}])`, 
@@ -329,7 +328,6 @@
 
             useEffect(() => { if (maxLossLimit === '0' && maxWinForHouse > 0) setMaxLossLimit((maxWinForHouse * 0.9).toFixed(0)); }, [maxWinForHouse]);
             
-            // 一键复制建议转出 (v6.13: 格式调整)
             const copySuggestions = () => {
                 const lines = data
                     .map(d => {
@@ -337,7 +335,6 @@
                         if (d.customerPL > parseFloat(maxLossLimit)) advice = Math.max(advice, (d.customerPL - parseFloat(maxLossLimit))/46.5);
                         if (d.betAmt > parseFloat(maxBetLimit)) advice = Math.max(advice, d.betAmt - parseFloat(maxBetLimit));
                         advice = Math.round(advice);
-                        // v6.13: 格式 Number=Amount，用空格分隔
                         return advice > 0 ? `${d.num}=${advice}` : null;
                     })
                     .filter(l => l !== null);
@@ -452,7 +449,7 @@
             const [customers, setCustomers] = useState(() => {
                 const s = localStorage.getItem('lottery_customers');
                 if (s) return JSON.parse(s);
-                // v6.13: 默认初始客户
+                // v6.15: 默认初始客户
                 return [
                     {id:'def_1', name:'张三', customerType:'客户', odds:47.5, rebate:0.02, aliases:[]},
                     {id:'def_2', name:'李四', customerType:'客户', odds:47.5, rebate:0.03, aliases:[]},
@@ -474,6 +471,9 @@
             const [confirmation, setConfirmation] = useState(null);
             const [showHedgingModal, setShowHedgingModal] = useState(false);
             
+            // 账本视图模式 ('ALL' | 'CURRENT')
+            const [ledgerViewMode, setLedgerViewMode] = useState('ALL');
+
             // 对账相关
             const [winningNumberHK, setWinningNumberHK] = useState('');
             const [winningNumberMO, setWinningNumberMO] = useState('');
@@ -690,6 +690,7 @@
                 
                 if (segments.length > 0) {
                     if (clientTotal) segments[0].clientTotal = clientTotal;
+                    // 如果有 contentWithoutTotal，确保第一条记录携带它，用于显示完整原始记录
                     if (contentWithoutTotal) segments[0].fullText = contentWithoutTotal;
                 }
                 
@@ -752,7 +753,9 @@
                 setBets(prev => [...prev, ...newBets]);
                 let msg = `成功提交！共 ¥${total}`;
                 showAlert(msg, 'success');
-                setInputContent(''); setActiveTab('customers');
+                setInputContent(''); 
+                setActiveTab('customers');
+                setLedgerViewMode('CURRENT'); // v6.15: Auto switch to current customer view
             };
 
             // --- 清空功能 ---
@@ -768,11 +771,10 @@
                                 if (!target) return;
                                 setActionSheet(null); 
                                 setTimeout(() => {
-                                    if(confirm(`确定仅删除 ${target} 的记录吗？`)) {
-                                        setBets(prev => prev.filter(b => b.customerName !== target));
-                                        showAlert(`已清空 ${target} 的记录`, 'success');
-                                    }
-                                }, 100);
+                                    // 直接执行逻辑，不依赖原生 confirm
+                                    setBets(prev => prev.filter(b => b.customerName !== target));
+                                    showAlert(`已清空 ${target} 的记录`, 'success');
+                                }, 50);
                             }
                         },
                         { 
@@ -943,7 +945,7 @@
                 <div className="max-w-md mx-auto min-h-screen pb-24">
                     {/* 顶部 Header */}
                     <div className="bg-indigo-600 text-white p-4 sticky top-0 z-50 shadow-lg flex justify-between items-center">
-                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.13</div>
+                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.15</div>
                         <button onClick={()=>setShowSettings(true)} className="bg-indigo-500 px-3 py-1 rounded text-sm font-bold hover:bg-indigo-400">客户管理</button>
                     </div>
                     {message && (<div className={`fixed top-16 left-4 right-4 p-3 rounded-lg shadow-xl text-white z-[60] text-center ${message.type==='error'?'bg-red-500':'bg-green-500'} animate-bounce`}>{message.text}</div>)}
@@ -1017,10 +1019,32 @@
                                 </div>
                             </div>
                         )}
-                        {/* Customers Tab */}
+                        {/* Customers Tab (Ledger) */}
                         {activeTab === 'customers' && (
                             <div className="space-y-4 pb-20">
-                                {customerStats.map(cust => (
+                                {/* Ledger View Toggle */}
+                                <div className="bg-white p-2 rounded-xl shadow-sm border border-indigo-50 flex justify-between items-center">
+                                     <span className="font-bold text-slate-700 text-sm ml-2 flex items-center gap-1"><Icon name="BookOpen" className="w-4 h-4 text-indigo-500"/> 账本显示:</span>
+                                     <div className="flex border rounded overflow-hidden text-xs">
+                                         <button 
+                                            onClick={() => setLedgerViewMode('ALL')}
+                                            className={`px-3 py-1.5 transition-colors ${ledgerViewMode === 'ALL' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                                         >
+                                            总单 (全部)
+                                         </button>
+                                         <button 
+                                            onClick={() => setLedgerViewMode('CURRENT')}
+                                            className={`px-3 py-1.5 transition-colors ${ledgerViewMode === 'CURRENT' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'} ${!inputCustomer ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            disabled={!inputCustomer}
+                                         >
+                                            个人 ({inputCustomer || '未选'})
+                                         </button>
+                                     </div>
+                                </div>
+
+                                {customerStats
+                                    .filter(c => ledgerViewMode === 'ALL' || (ledgerViewMode === 'CURRENT' && c.name === inputCustomer))
+                                    .map(cust => (
                                     <details key={cust.name} open className="bg-white border rounded-xl shadow-sm overflow-hidden group">
                                         <summary className="flex justify-between items-center p-4 cursor-pointer bg-slate-50 group-open:bg-indigo-50 transition-colors">
                                             <div className="font-bold text-lg text-slate-800">{cust.name}</div>
@@ -1047,6 +1071,13 @@
                                         </div>
                                     </details>
                                 ))}
+                                
+                                {customerStats.filter(c => ledgerViewMode === 'ALL' || (ledgerViewMode === 'CURRENT' && c.name === inputCustomer)).length === 0 && (
+                                    <div className="text-center text-slate-400 py-10 flex flex-col items-center gap-2">
+                                        <Icon name="BookOpen" className="w-8 h-8 text-slate-200"/>
+                                        <span>暂无相关记录</span>
+                                    </div>
+                                )}
                             </div>
                         )}
                         {/* Risk Tab */}
@@ -1165,7 +1196,7 @@
                     )}
                     {batchToEdit && <EditOrderModal batchId={batchToEdit} onClose={()=>setBatchToEdit(null)} onSave={handleSaveEditedBatch} bets={bets} parseContentForSegments={(t,a)=>parseContentForSegments(t,a,currentYearZodiac)} />}
                     {viewingRawBatch && <RawRecordModal batch={viewingRawBatch} onClose={()=>setViewingRawBatch(null)} />}
-                    {showHedgingModal && <HedgingModal onClose={()=>setShowHedgingModal(false)} riskStats={riskStats} riskFilter={riskFilter} customers={customers} bets={bets} showAlert={showAlert} />}
+                    {showHedgingModal && <HedgingModal onClose={()=>setShowHedgingModal(false)} riskStats={riskStats} riskFilter={riskFilter} customers={customers} bets={bets} />}
                     <ConfirmationModal confirmation={confirmation} />
                 </div>
             );
