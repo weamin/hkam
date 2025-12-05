@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>彩票风控系统 v6.15</title>
+    <title>彩票风控系统 v6.14</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -17,7 +17,8 @@
         @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .animate-pulse-slow { animation: pulse-slow 3s infinite; }
         input, textarea, select { font-size: 16px !important; } 
-        .modal-overlay { z-index: 9999; }
+        /* 弹窗层级极高，确保盖住底部导航 */
+        .modal-overlay { z-index: 5000 !important; }
         #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; max-width: 28rem; margin: 0 auto; }
     </style>
 </head>
@@ -133,7 +134,7 @@
         const ActionSheet = ({ title, actions, onCancel }) => {
             if (!actions) return null;
             return (
-                <div className="fixed inset-0 bg-black/50 z-[100] flex items-end sm:items-center justify-center p-4 modal-overlay animate-in fade-in">
+                <div className="fixed inset-0 bg-black/50 z-[3000] flex items-end sm:items-center justify-center p-4 modal-overlay animate-in fade-in">
                     <div className="bg-white w-full max-w-sm rounded-xl p-4 space-y-3 shadow-2xl slide-in-from-bottom-10">
                         {title && <div className="text-center font-bold text-gray-500 pb-2 border-b text-sm">{title}</div>}
                         {actions.map((action, idx) => (
@@ -154,7 +155,7 @@
         const ConfirmationModal = ({ confirmation }) => {
             if (!confirmation) return null;
             return (
-                <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 modal-overlay">
+                <div className="fixed inset-0 bg-black/50 z-[3000] flex items-center justify-center p-4 modal-overlay">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4 animate-in zoom-in-95">
                         <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center"><Icon name="AlertTriangle" className="w-6 h-6 text-red-600"/></div>
                         <p className="text-center font-bold text-lg text-slate-800 whitespace-pre-line">{confirmation.message}</p>
@@ -179,7 +180,7 @@
         };
 
         const CustomerSelectModal = ({ customers, onSelect, onClose }) => (
-            <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 modal-overlay animate-in fade-in">
+            <div className="fixed inset-0 bg-black/50 z-[3000] flex items-center justify-center p-4 modal-overlay animate-in fade-in">
                 <div className="bg-white w-full max-w-sm rounded-xl p-4 max-h-[80vh] flex flex-col shadow-2xl">
                     <div className="flex justify-between items-center mb-4 border-b pb-2">
                         <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Icon name="User" className="w-5 h-5 text-indigo-600"/> 选择客户</h3>
@@ -201,7 +202,7 @@
         const MessageToast = ({ message }) => {
             if (!message) return null;
             const color = message.type === 'success' ? 'bg-green-500' : message.type === 'warning' ? 'bg-orange-500' : 'bg-red-500';
-            return <div className={`fixed top-4 right-4 z-[100] flex gap-3 p-4 rounded-lg shadow-xl text-white ${color}`}><Icon name="Check" className="w-5 h-5"/><span>{message.text}</span></div>;
+            return <div className={`fixed top-4 right-4 z-[4000] flex gap-3 p-4 rounded-lg shadow-xl text-white ${color}`}><Icon name="Check" className="w-5 h-5"/><span>{message.text}</span></div>;
         };
 
         const MobileRiskTable = ({title,color,data,total}) => (
@@ -241,7 +242,7 @@
             });
             const total = stats.reduce((a,b)=>a+b.amt,0);
             return (
-                <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-in fade-in modal-overlay">
+                <div className="fixed inset-0 bg-black/80 z-[3000] flex items-center justify-center p-4 animate-in fade-in modal-overlay">
                     <div className="bg-white w-full h-[80vh] rounded-xl flex flex-col overflow-hidden">
                         <div className="p-4 border-b flex justify-between items-center bg-slate-50">
                             <div className="font-bold text-lg">订单校对 <div className="text-xs font-normal text-slate-500 mt-1">{header}</div></div>
@@ -280,7 +281,7 @@
         };
 
         const RawRecordModal = ({ batch, onClose }) => (
-            <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 modal-overlay">
+            <div className="fixed inset-0 bg-black/80 z-[3000] flex items-center justify-center p-4 modal-overlay">
                 <div className="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl">
                     <h3 className="font-bold text-lg mb-4 border-b pb-2">原始下单记录</h3>
                     <div className="bg-slate-100 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto text-slate-700">
@@ -358,7 +359,7 @@
             }).filter(d => d.advice > 0 || d.customerPL > parseFloat(maxLossLimit) || d.betAmt > parseFloat(maxBetLimit));
 
             return (
-                <div className="fixed inset-0 bg-black/80 z-[200] flex items-end sm:items-center justify-center modal-overlay">
+                <div className="fixed inset-0 bg-black/80 z-[3000] flex items-end sm:items-center justify-center modal-overlay">
                     <div className="bg-white w-full sm:w-[600px] h-[95vh] sm:h-[85vh] rounded-t-2xl sm:rounded-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10">
                         <div className="p-3 bg-slate-100 border-b flex justify-between items-center shrink-0">
                             <h3 className="font-bold flex items-center gap-2 text-base"><Icon name="Scale" className="w-5 h-5"/> 智能转单</h3>
@@ -449,7 +450,7 @@
             const [customers, setCustomers] = useState(() => {
                 const s = localStorage.getItem('lottery_customers');
                 if (s) return JSON.parse(s);
-                // v6.15: 默认初始客户
+                // v6.13: 默认初始客户
                 return [
                     {id:'def_1', name:'张三', customerType:'客户', odds:47.5, rebate:0.02, aliases:[]},
                     {id:'def_2', name:'李四', customerType:'客户', odds:47.5, rebate:0.03, aliases:[]},
@@ -471,9 +472,6 @@
             const [confirmation, setConfirmation] = useState(null);
             const [showHedgingModal, setShowHedgingModal] = useState(false);
             
-            // 账本视图模式 ('ALL' | 'CURRENT')
-            const [ledgerViewMode, setLedgerViewMode] = useState('ALL');
-
             // 对账相关
             const [winningNumberHK, setWinningNumberHK] = useState('');
             const [winningNumberMO, setWinningNumberMO] = useState('');
@@ -753,9 +751,7 @@
                 setBets(prev => [...prev, ...newBets]);
                 let msg = `成功提交！共 ¥${total}`;
                 showAlert(msg, 'success');
-                setInputContent(''); 
-                setActiveTab('customers');
-                setLedgerViewMode('CURRENT'); // v6.15: Auto switch to current customer view
+                setInputContent(''); setActiveTab('customers');
             };
 
             // --- 清空功能 ---
@@ -945,7 +941,7 @@
                 <div className="max-w-md mx-auto min-h-screen pb-24">
                     {/* 顶部 Header */}
                     <div className="bg-indigo-600 text-white p-4 sticky top-0 z-50 shadow-lg flex justify-between items-center">
-                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.15</div>
+                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.13</div>
                         <button onClick={()=>setShowSettings(true)} className="bg-indigo-500 px-3 py-1 rounded text-sm font-bold hover:bg-indigo-400">客户管理</button>
                     </div>
                     {message && (<div className={`fixed top-16 left-4 right-4 p-3 rounded-lg shadow-xl text-white z-[60] text-center ${message.type==='error'?'bg-red-500':'bg-green-500'} animate-bounce`}>{message.text}</div>)}
@@ -1019,32 +1015,10 @@
                                 </div>
                             </div>
                         )}
-                        {/* Customers Tab (Ledger) */}
+                        {/* Customers Tab */}
                         {activeTab === 'customers' && (
                             <div className="space-y-4 pb-20">
-                                {/* Ledger View Toggle */}
-                                <div className="bg-white p-2 rounded-xl shadow-sm border border-indigo-50 flex justify-between items-center">
-                                     <span className="font-bold text-slate-700 text-sm ml-2 flex items-center gap-1"><Icon name="BookOpen" className="w-4 h-4 text-indigo-500"/> 账本显示:</span>
-                                     <div className="flex border rounded overflow-hidden text-xs">
-                                         <button 
-                                            onClick={() => setLedgerViewMode('ALL')}
-                                            className={`px-3 py-1.5 transition-colors ${ledgerViewMode === 'ALL' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-                                         >
-                                            总单 (全部)
-                                         </button>
-                                         <button 
-                                            onClick={() => setLedgerViewMode('CURRENT')}
-                                            className={`px-3 py-1.5 transition-colors ${ledgerViewMode === 'CURRENT' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'} ${!inputCustomer ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            disabled={!inputCustomer}
-                                         >
-                                            个人 ({inputCustomer || '未选'})
-                                         </button>
-                                     </div>
-                                </div>
-
-                                {customerStats
-                                    .filter(c => ledgerViewMode === 'ALL' || (ledgerViewMode === 'CURRENT' && c.name === inputCustomer))
-                                    .map(cust => (
+                                {customerStats.map(cust => (
                                     <details key={cust.name} open className="bg-white border rounded-xl shadow-sm overflow-hidden group">
                                         <summary className="flex justify-between items-center p-4 cursor-pointer bg-slate-50 group-open:bg-indigo-50 transition-colors">
                                             <div className="font-bold text-lg text-slate-800">{cust.name}</div>
@@ -1071,13 +1045,6 @@
                                         </div>
                                     </details>
                                 ))}
-                                
-                                {customerStats.filter(c => ledgerViewMode === 'ALL' || (ledgerViewMode === 'CURRENT' && c.name === inputCustomer)).length === 0 && (
-                                    <div className="text-center text-slate-400 py-10 flex flex-col items-center gap-2">
-                                        <Icon name="BookOpen" className="w-8 h-8 text-slate-200"/>
-                                        <span>暂无相关记录</span>
-                                    </div>
-                                )}
                             </div>
                         )}
                         {/* Risk Tab */}
@@ -1120,7 +1087,7 @@
                                             </div>
                                             {expandedReconciliation===s.name && (
                                                 <div className="bg-slate-50 p-2 rounded text-xs font-mono mt-2 space-y-1 max-h-96 overflow-y-auto">
-                                                    <div className="flex flex-col gap-2"> {/* 单列模式 */}
+                                                    <div className="flex flex-col gap-4">
                                                         {s.batchDetails.map(b => {
                                                             const winTot = b.winHK+b.winMO;
                                                             let winLbl = '';
@@ -1130,7 +1097,7 @@
                                                                 else winLbl=`[中: ¥${winTot} (澳)]`;
                                                             }
                                                             return (
-                                                                <div key={b.idx} className="flex flex-wrap justify-start items-center border-b border-slate-200 last:border-0 pb-2 pt-1 gap-4" onClick={(e)=>{e.stopPropagation();setViewingRawBatch(b)}}>
+                                                                <div key={b.idx} className="flex justify-start items-center border-b border-slate-200 last:border-0 pb-2 pt-1 gap-6 break-inside-avoid" onClick={(e)=>{e.stopPropagation();setViewingRawBatch(b)}}>
                                                                     <span className="font-bold text-slate-700 text-sm whitespace-nowrap">({b.idx}) 合计: {b.total}</span>
                                                                     {winTot>0 && <span className="text-red-600 font-bold text-sm">{winLbl}</span>}
                                                                 </div>
@@ -1196,7 +1163,7 @@
                     )}
                     {batchToEdit && <EditOrderModal batchId={batchToEdit} onClose={()=>setBatchToEdit(null)} onSave={handleSaveEditedBatch} bets={bets} parseContentForSegments={(t,a)=>parseContentForSegments(t,a,currentYearZodiac)} />}
                     {viewingRawBatch && <RawRecordModal batch={viewingRawBatch} onClose={()=>setViewingRawBatch(null)} />}
-                    {showHedgingModal && <HedgingModal onClose={()=>setShowHedgingModal(false)} riskStats={riskStats} riskFilter={riskFilter} customers={customers} bets={bets} />}
+                    {showHedgingModal && <HedgingModal onClose={()=>setShowHedgingModal(false)} riskStats={riskStats} riskFilter={riskFilter} customers={customers} bets={bets} showAlert={showAlert} />}
                     <ConfirmationModal confirmation={confirmation} />
                 </div>
             );
