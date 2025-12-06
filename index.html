@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>彩票风控系统 v6.19 (单机版)</title>
+    <title>彩票风控系统 v6.24 (单机版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -50,7 +50,8 @@
                 User: <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />,
                 UserCircle: <g><circle cx="12" cy="12" r="10" /><circle cx="12" cy="10" r="3" /><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" /></g>,
                 Copy: <g><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></g>,
-                Filter: <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                Filter: <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />,
+                ArrowRight: <line x1="5" y1="12" x2="19" y2="12" />,
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -98,12 +99,12 @@
         const CH_NUM = "零一二三四五六七八九十百千两";
         const UNITS = "元米斤块";
         
-        // v6.19: 增强的金额正则表达式，允许在关键词、数字、单位之间存在噪音字符（空格、点、句号、省略号、波浪号）
+        // v6.20: 增加 "每个"、"每号" 关键词支持，且置于单字关键词之前优先匹配
         const BASE_AMOUNT_PARTS = [
-            `((各|买|x|X|号|=|每)[\\s.．。…~]*\\d+(\\.\\d+)?[\\s.．。…~]*[${UNITS}]?)`, 
+            `((每个|每号|各|买|x|X|号|=|每)[\\s.．。…~]*\\d+(\\.\\d+)?[\\s.．。…~]*[${UNITS}]?)`, 
             `(\\d+(\\.\\d+)?[\\s.．。…~]*[${UNITS}])`, 
             `(\\d+(\\.\\d+)?x)`, 
-            `((各|买|x|X|号|=|每)[\\s.．。…~]*[${CH_NUM}]+[\\s.．。…~]*[${UNITS}]?)`, 
+            `((每个|每号|各|买|x|X|号|=|每)[\\s.．。…~]*[${CH_NUM}]+[\\s.．。…~]*[${UNITS}]?)`, 
             `([${CH_NUM}]+[\\s.．。…~]*[${UNITS}])`, 
             `((?<=[\\d\\s])[${CH_NUM}]+(?!([岁尾头])))`, 
             `(?<=[号])\\d+(\\.\\d+)?` 
@@ -361,22 +362,56 @@
                 return { ...d, advice: Math.round(advice) };
             }).filter(d => d.advice > 0 || d.customerPL > parseFloat(maxLossLimit) || d.betAmt > parseFloat(maxBetLimit));
 
+            // v6.22 新增：计算转出后的盈亏
+            const totalAdvice = filteredData.reduce((acc, d) => acc + d.advice, 0);
+            
+            // 重新计算转出后的每个号码的盈亏
+            // 逻辑：原盈亏 - (转出金额 * 47.5) + 总转出成本
+            // 注：原 customerPL 是 (客户赢钱 - 池底)，正数代表庄家亏，负数代表庄家赢
+            // 转出 d.advice 元，意味着如果该号码中奖，我们会从上家收到 d.advice * 47.5
+            // 这笔钱会抵消我们的亏损 (customerPL 减小)
+            // 但是我们付出了 totalAdvice 的成本 (customerPL 增加)
+            const postTransferData = data.map(d => {
+                const adviceItem = filteredData.find(f => f.num === d.num);
+                const adviceAmt = adviceItem ? adviceItem.advice : 0;
+                // 使用 47.5 作为外盘赔率 (基于 46.5 是除数推导出的净赔率)
+                const newPL = d.customerPL - (adviceAmt * 47.5) + totalAdvice;
+                return newPL;
+            });
+
+            const maxWinPostTransfer = -Math.min(...postTransferData);
+            const maxLossPostTransfer = Math.max(...postTransferData);
+
             return (
                 <div className="fixed inset-0 bg-black/80 z-[3000] flex items-end sm:items-center justify-center modal-overlay">
                     <div className="bg-white w-full sm:w-[600px] h-[95vh] sm:h-[85vh] rounded-t-2xl sm:rounded-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10">
                         <div className="p-3 bg-slate-100 border-b flex justify-between items-center shrink-0">
                             <h3 className="font-bold flex items-center gap-2 text-base"><Icon name="Scale" className="w-5 h-5"/> 智能转单</h3>
-                            <button onClick={onClose}><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
+                            <button onClick={onClose} className="p-2 -mr-2"><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
                         </div>
                         
-                        <div className="bg-blue-50 p-2 text-xs flex justify-between border-b border-blue-100 shrink-0">
+                        <div className="bg-blue-50 p-2 text-xs grid grid-cols-2 gap-x-4 border-b border-blue-100 shrink-0">
                              <div>
-                                <span className="text-slate-500 mr-1">庄家最高可赢:</span>
-                                <span className="text-green-600 font-bold text-base">+¥{Math.round(maxWinForHouse).toLocaleString()}</span>
+                                <div className="flex justify-between items-end">
+                                    <span className="text-slate-500">最高可赢:</span>
+                                    <span className="text-green-600 font-bold text-base">+¥{Math.round(maxWinForHouse).toLocaleString()}</span>
+                                </div>
+                                {/* v6.22 新增转后数据 */}
+                                <div className="flex justify-between items-end mt-1 border-t border-blue-100 pt-1">
+                                    <span className="text-purple-500 font-bold">转后可赢:</span>
+                                    <span className="text-purple-700 font-bold text-base">+¥{Math.round(maxWinPostTransfer).toLocaleString()}</span>
+                                </div>
                              </div>
-                             <div className="text-right">
-                                <span className="text-slate-500 mr-1">庄家最大风险:</span>
-                                <span className="text-red-600 font-bold text-base">¥{Math.round(maxLossForHouse).toLocaleString()}</span>
+                             <div>
+                                <div className="flex justify-between items-end">
+                                    <span className="text-slate-500">最大风险:</span>
+                                    <span className="text-red-600 font-bold text-base">¥{Math.round(maxLossForHouse).toLocaleString()}</span>
+                                </div>
+                                {/* v6.22 新增转后数据 */}
+                                <div className="flex justify-between items-end mt-1 border-t border-blue-100 pt-1">
+                                    <span className="text-orange-500 font-bold">转后风险:</span>
+                                    <span className="text-orange-600 font-bold text-base">¥{Math.round(maxLossPostTransfer).toLocaleString()}</span>
+                                </div>
                              </div>
                         </div>
 
@@ -436,10 +471,13 @@
                             </table>
                         </div>
                         
-                        <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding">
-                            <button onClick={copySuggestions} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                        <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding flex gap-3">
+                            <button onClick={onClose} className="w-24 bg-slate-100 text-slate-600 border border-slate-300 py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-transform">
+                                关闭
+                            </button>
+                            <button onClick={copySuggestions} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
                                 <Icon name="ClipboardCheck" className="w-5 h-5"/> 
-                                {copyMsg || `复制转单列表 (${filteredData.filter(d=>d.advice>0).length}条)`}
+                                {copyMsg || `复制转单 (${filteredData.filter(d=>d.advice>0).length})`}
                             </button>
                         </div>
                     </div>
@@ -486,6 +524,9 @@
             // v6.17: 账本页面筛选
             const [bookMode, setBookMode] = useState('ALL'); // 'ALL' or 'SINGLE'
             const [bookTarget, setBookTarget] = useState('');
+
+            // v6.23: 文本预览弹窗状态
+            const [textPreview, setTextPreview] = useState(null);
 
             const showAlert = (text, type='error') => { setMessage({text,type}); setTimeout(()=>setMessage(null),3000); };
 
@@ -944,9 +985,9 @@
                     const w = b.winHK+b.winMO;
                     let lbl = '';
                     if(w>0) {
-                        if(b.winHK>0 && b.winMO>0) lbl=` [中: ¥${w} (港${b.winHK}+澳${b.winMO})]`;
+                        if(b.winHK>0 && b.winMO>0) lbl=` [中: ¥${w} (港${b.winHK}+门${b.winMO})]`; // v6.24: "门" instead of "澳"
                         else if(b.winHK>0) lbl=` [中: ¥${w} (港)]`;
-                        else lbl=` [中: ¥${w} (澳)]`;
+                        else lbl=` [中: ¥${w}]`; // v6.24: No label for pure Macau win
                     }
                     return `(${b.idx})合计: ${b.total}${lbl}`;
                 }).join('\n');
@@ -955,6 +996,7 @@
                 el.value = txt; document.body.appendChild(el); el.select();
                 document.execCommand('copy'); document.body.removeChild(el);
                 showAlert('已复制', 'success');
+                setTextPreview({ title: `${stat.name} 对账详单`, content: txt });
             }
 
             // v6.17 账本渲染辅助
@@ -971,7 +1013,7 @@
                 <div className="max-w-md mx-auto min-h-screen pb-24">
                     {/* 顶部 Header */}
                     <div className="bg-indigo-600 text-white p-4 sticky top-0 z-50 shadow-lg flex justify-between items-center">
-                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.19</div>
+                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.24</div>
                         <button onClick={()=>setShowSettings(true)} className="bg-indigo-500 px-3 py-1 rounded text-sm font-bold hover:bg-indigo-400">客户管理</button>
                     </div>
                     {message && (<div className={`fixed top-16 left-4 right-4 p-3 rounded-lg shadow-xl text-white z-[60] text-center ${message.type==='error'?'bg-red-500':'bg-green-500'} animate-bounce`}>{message.text}</div>)}
@@ -1165,9 +1207,9 @@
                                                             const winTot = b.winHK+b.winMO;
                                                             let winLbl = '';
                                                             if(winTot>0) {
-                                                                if(b.winHK>0 && b.winMO>0) winLbl=`[中: ¥${winTot} (港${b.winHK}+澳${b.winMO})]`;
+                                                                if(b.winHK>0 && b.winMO>0) winLbl=`[中: ¥${winTot} (港${b.winHK}+门${b.winMO})]`; // v6.24: Use "门" instead of "澳" for contrast
                                                                 else if(b.winHK>0) winLbl=`[中: ¥${winTot} (港)]`;
-                                                                else winLbl=`[中: ¥${winTot} (澳)]`;
+                                                                else winLbl=`[中: ¥${winTot}]`; // v6.24: No label for pure Macau win
                                                             }
                                                             return (
                                                                 <div key={b.idx} className="flex justify-start items-center border-b border-slate-200 last:border-0 pb-2 pt-1 gap-6 break-inside-avoid" onClick={(e)=>{e.stopPropagation();setViewingRawBatch(b)}}>
@@ -1230,6 +1272,32 @@
                                 <div className="mt-4 flex gap-2">
                                     <button onClick={()=>setTempCustomers([...tempCustomers, {id:Math.random().toString(),name:'',customerType:'客户',odds:47.5,rebate:0.1,aliases:[]}])} className="flex-1 bg-green-500 text-white py-2 rounded font-bold">新增客户</button>
                                     <button onClick={handleSaveCustomers} className="flex-1 bg-blue-500 text-white py-2 rounded font-bold">保存设置</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {textPreview && (
+                        <div className="fixed inset-0 bg-black/50 z-[3000] flex items-center justify-center p-4 modal-overlay animate-in fade-in">
+                            <div className="bg-white w-full max-w-sm rounded-xl p-4 shadow-2xl flex flex-col h-[60vh]">
+                                <div className="flex justify-between items-center border-b pb-2 mb-2">
+                                    <h3 className="font-bold text-lg text-slate-800">{textPreview.title}</h3>
+                                    <button onClick={()=>setTextPreview(null)}><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
+                                </div>
+                                <textarea 
+                                    className="flex-1 w-full p-3 border rounded-lg bg-slate-50 font-mono text-sm resize-none focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={textPreview.content}
+                                    onChange={(e) => setTextPreview({...textPreview, content: e.target.value})}
+                                />
+                                <div className="flex gap-3 mt-4 shrink-0">
+                                    <button onClick={()=>setTextPreview(null)} className="flex-1 py-3 border rounded-lg font-bold text-slate-500">关闭</button>
+                                    <button onClick={()=>{
+                                         const el = document.createElement('textarea');
+                                         el.value = textPreview.content; document.body.appendChild(el); el.select();
+                                         document.execCommand('copy'); document.body.removeChild(el);
+                                         showAlert('再次复制成功', 'success');
+                                    }} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg flex items-center justify-center gap-2">
+                                        <Icon name="Copy" className="w-4 h-4"/> 再次复制
+                                    </button>
                                 </div>
                             </div>
                         </div>
