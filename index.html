@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>彩票风控系统 v6.27 (单机版)</title>
+    <title>彩票风控系统 v6.28 (单机版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -99,6 +99,7 @@
         const CH_NUM = "零一二三四五六七八九十百千两";
         const UNITS = "元米斤块";
         
+        // v6.20: 增加 "每个"、"每号" 关键词支持，且置于单字关键词之前优先匹配
         const BASE_AMOUNT_PARTS = [
             `((每个|每号|各|买|x|X|号|=|每)[\\s.．。…~]*\\d+(\\.\\d+)?[\\s.．。…~]*[${UNITS}]?)`, 
             `(\\d+(\\.\\d+)?[\\s.．。…~]*[${UNITS}])`, 
@@ -110,6 +111,7 @@
         ].join("|");
 
         const REGEX_AMOUNT_NO_SLASH = new RegExp(BASE_AMOUNT_PARTS, 'gi');
+        // 允许斜杠/后跟噪音字符（空格、点、波浪号等）
         const REGEX_AMOUNT_WITH_SLASH = new RegExp(`${BASE_AMOUNT_PARTS}|(\\/[\\s.．。…~]*\\d+(\\.\\d+)?\\s*[${UNITS}]?)`, 'gi');
         const REGEX_AMOUNT_DELIMITER = REGEX_AMOUNT_WITH_SLASH;
         const REGEX_CHAT_HEADER = /^.*(\(xxf\)|15759804578|[:：]$).*/i;
@@ -363,22 +365,18 @@
             // v6.22 新增：计算转出后的盈亏
             const totalAdvice = filteredData.reduce((acc, d) => acc + d.advice, 0);
             
-            // 重新计算转出后的每个号码的盈亏
-            // 逻辑：原盈亏 - (转出金额 * 47.5) + 总转出成本
-            // 注：原 customerPL 是 (客户赢钱 - 池底)，正数代表庄家亏，负数代表庄家赢
-            // 转出 d.advice 元，意味着如果该号码中奖，我们会从上家收到 d.advice * 47.5
-            // 这笔钱会抵消我们的亏损 (customerPL 减小)
-            // 但是我们付出了 totalAdvice 的成本 (customerPL 增加)
             const postTransferData = data.map(d => {
                 const adviceItem = filteredData.find(f => f.num === d.num);
                 const adviceAmt = adviceItem ? adviceItem.advice : 0;
                 // 使用 47.5 作为外盘赔率 (基于 46.5 是除数推导出的净赔率)
                 const newPL = d.customerPL - (adviceAmt * 47.5) + totalAdvice;
-                return newPL;
+                return { ...d, postTransferPL: newPL, advice: adviceAmt };
             });
+            // Update filter to include pre-calculated postTransferPL
+            const displayData = postTransferData.filter(d => d.advice > 0 || d.customerPL > parseFloat(maxLossLimit) || d.betAmt > parseFloat(maxBetLimit));
 
-            const maxWinPostTransfer = -Math.min(...postTransferData);
-            const maxLossPostTransfer = Math.max(...postTransferData);
+            const maxWinPostTransfer = -Math.min(...postTransferData.map(d=>d.postTransferPL));
+            const maxLossPostTransfer = Math.max(...postTransferData.map(d=>d.postTransferPL));
 
             return (
                 <div className="fixed inset-0 bg-black/80 z-[3000] flex items-end sm:items-center justify-center modal-overlay">
@@ -431,7 +429,7 @@
                                 </div>
                                 <div className="w-px h-4 bg-slate-300"></div>
                                 <div className="flex-1 flex items-center gap-1">
-                                    <span className="text-slate-500 text-xs whitespace-nowrap">限红:</span>
+                                    <span className="text-slate-500 text-xs whitespace-nowrap">最大吃码:</span>
                                     <input type="number" value={maxBetLimit} onChange={e=>setMaxBetLimit(e.target.value)} className="w-full border-b border-slate-300 bg-transparent text-center font-bold text-indigo-600 text-sm p-0 focus:ring-0"/>
                                 </div>
                             </div>
@@ -445,23 +443,25 @@
                                         <th className="p-2 text-right text-orange-600 font-bold bg-orange-50">建议转出</th>
                                         <th className="p-2 text-right">当前下注</th>
                                         <th className="p-2 pr-4 text-right">风险盈亏</th>
+                                        <th className="p-2 pr-4 text-right">转后盈亏</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {filteredData.length === 0 ? (
-                                        <tr><td colSpan={4} className="p-10 text-center text-slate-400">
+                                    {displayData.length === 0 ? (
+                                        <tr><td colSpan={5} className="p-10 text-center text-slate-400">
                                             <div className="flex flex-col items-center gap-2">
                                                 <Icon name="Check" className="w-8 h-8 text-green-200"/>
                                                 <span>当前无风险预警</span>
                                             </div>
                                         </td></tr>
                                     ) : (
-                                        filteredData.map((d) => (
+                                        displayData.map((d) => (
                                             <tr key={d.num} className="active:bg-slate-50 transition-colors">
                                                 <td className="p-2 pl-4 font-bold text-lg font-mono">{d.num}</td>
                                                 <td className="p-2 text-right text-orange-600 font-bold text-lg bg-orange-50/30">¥{d.advice}</td>
                                                 <td className="p-2 text-right text-slate-600">{d.betAmt}</td>
                                                 <td className={`p-2 pr-4 text-right font-bold ${d.customerPL>0?'text-red-600':'text-green-600'}`}>{Math.round(d.customerPL)}</td>
+                                                <td className={`p-2 pr-4 text-right font-bold ${d.postTransferPL>0?'text-red-600':'text-green-600'}`}>{Math.round(d.postTransferPL)}</td>
                                             </tr>
                                         ))
                                     )}
@@ -475,7 +475,7 @@
                             </button>
                             <button onClick={copySuggestions} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
                                 <Icon name="ClipboardCheck" className="w-5 h-5"/> 
-                                {copyMsg || `复制转单 (${filteredData.filter(d=>d.advice>0).length})`}
+                                {copyMsg || `复制转单 (${displayData.filter(d=>d.advice>0).length})`}
                             </button>
                         </div>
                     </div>
@@ -993,7 +993,7 @@
                     const w = b.winHK+b.winMO;
                     let lbl = '';
                     if(w>0) {
-                        if(b.winHK>0 && b.winMO>0) lbl=` [中: ¥${w} (港${b.winHK}+门${b.winMO})]`; // v6.24: "门" instead of "澳"
+                        if(b.winHK>0 && b.winMO>0) lbl=` [中: ¥${w} (港${b.winHK}+门${b.winMO})]`; // v6.24: Use "门" instead of "澳" for contrast
                         else if(b.winHK>0) lbl=` [中: ¥${w} (港)]`;
                         else lbl=` [中: ¥${w}]`; // v6.24: No label for pure Macau win
                     }
@@ -1021,7 +1021,7 @@
                 <div className="max-w-md mx-auto min-h-screen pb-24">
                     {/* 顶部 Header */}
                     <div className="bg-indigo-600 text-white p-4 sticky top-0 z-50 shadow-lg flex justify-between items-center">
-                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.26</div>
+                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.28</div>
                         <button onClick={()=>setShowSettings(true)} className="bg-indigo-500 px-3 py-1 rounded text-sm font-bold hover:bg-indigo-400">客户管理</button>
                     </div>
                     {message && (<div className={`fixed top-16 left-4 right-4 p-3 rounded-lg shadow-xl text-white z-[60] text-center ${message.type==='error'?'bg-red-500':'bg-green-500'} animate-bounce`}>{message.text}</div>)}
