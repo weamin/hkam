@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>彩票风控系统 v6.24 (单机版)</title>
+    <title>彩票风控系统 v6.27 (单机版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -93,13 +93,12 @@
 
         const PATTERN_HK = "香港|香|港";
         const PATTERN_MO = "澳门|澳|门|奥|新澳门|老澳门"; 
-        const PATTERN_DUAL_STR = "香[^0-9a-zA-Z\\u4e00-\\u9fa5]*门"; 
+        const PATTERN_DUAL_STR = "(香[^0-9a-zA-Z\\u4e00-\\u9fa5]*门)|(港澳)|(港奥)"; 
         const REGEX_DUAL = new RegExp(PATTERN_DUAL_STR);
 
         const CH_NUM = "零一二三四五六七八九十百千两";
         const UNITS = "元米斤块";
         
-        // v6.20: 增加 "每个"、"每号" 关键词支持，且置于单字关键词之前优先匹配
         const BASE_AMOUNT_PARTS = [
             `((每个|每号|各|买|x|X|号|=|每)[\\s.．。…~]*\\d+(\\.\\d+)?[\\s.．。…~]*[${UNITS}]?)`, 
             `(\\d+(\\.\\d+)?[\\s.．。…~]*[${UNITS}])`, 
@@ -111,7 +110,6 @@
         ].join("|");
 
         const REGEX_AMOUNT_NO_SLASH = new RegExp(BASE_AMOUNT_PARTS, 'gi');
-        // 允许斜杠/后跟噪音字符（空格、点、波浪号等）
         const REGEX_AMOUNT_WITH_SLASH = new RegExp(`${BASE_AMOUNT_PARTS}|(\\/[\\s.．。…~]*\\d+(\\.\\d+)?\\s*[${UNITS}]?)`, 'gi');
         const REGEX_AMOUNT_DELIMITER = REGEX_AMOUNT_WITH_SLASH;
         const REGEX_CHAT_HEADER = /^.*(\(xxf\)|15759804578|[:：]$).*/i;
@@ -254,7 +252,8 @@
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             <div className="bg-yellow-50 p-3 rounded text-xs text-slate-600 border border-yellow-100">
-                                <strong>原始记录:</strong><pre className="whitespace-pre-wrap mt-1 font-mono">{originalDisplay}</pre>
+                                <strong className="block mb-1">原始记录:</strong>
+                                <pre className="whitespace-pre-wrap font-mono break-all">{originalDisplay}</pre>
                                 {clientTotal && <div className="mt-1 text-orange-600 font-bold">客户手写: {clientTotal}</div>}
                             </div>
                             {lines.map((l,i)=>(
@@ -263,7 +262,7 @@
                                     <textarea 
                                         value={l} 
                                         onChange={e=>{const n=[...lines];n[i]=e.target.value;setLines(n)}} 
-                                        className="flex-1 bg-transparent outline-none text-sm resize-none h-auto overflow-hidden"
+                                        className="flex-1 bg-transparent outline-none text-sm resize-none h-auto overflow-hidden break-all"
                                         rows={1}
                                         style={{minHeight:'24px'}}
                                     />
@@ -291,8 +290,7 @@
                     <div className="bg-slate-100 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto text-slate-700">
                         <div className="font-bold mb-2 text-slate-900">{batch.header}</div>
                         {batch.originalTotal && <div className="text-orange-600 font-bold mb-2">手写总计: {batch.originalTotal}</div>}
-                        {/* 优先显示 fullText (完整原始文本) */}
-                        {batch.fullText || batch.lines.join('\n')}
+                        <pre className="whitespace-pre-wrap break-all">{batch.fullText || batch.lines.join('\n')}</pre>
                     </div>
                     <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow">关闭</button>
                 </div>
@@ -650,11 +648,21 @@
                 const defAmt = parseFloat(defaultAmtStr) || 0;
                 const segments = [];
                 const lines = contentWithoutTotal.split(/[\n]/).filter(l => l.trim());
+                
+                // v6.26 Fix: Global context detection (后置签名识别)
+                // 如果全文包含“香港/香”且不含“澳门/澳”，则默认全单为香港
                 let currType = 'MO';
+                const hasHK = new RegExp(PATTERN_HK).test(contentWithoutTotal);
+                const hasMO = new RegExp(PATTERN_MO).test(contentWithoutTotal);
+                if (hasHK && !hasMO) {
+                    currType = 'HK';
+                }
 
                 lines.forEach(line => {
                     if (REGEX_CHAT_HEADER.test(line)) return;
                     const isOnlyType = (new RegExp(`^(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?$`).test(line.trim()));
+                    
+                    // 行内类型覆盖全局默认值
                     if (new RegExp(PATTERN_HK).test(line)) currType = 'HK';
                     else if (new RegExp(PATTERN_MO).test(line)) currType = 'MO';
                     else if (/奥|门/.test(line)) currType = 'MO';
@@ -1013,7 +1021,7 @@
                 <div className="max-w-md mx-auto min-h-screen pb-24">
                     {/* 顶部 Header */}
                     <div className="bg-indigo-600 text-white p-4 sticky top-0 z-50 shadow-lg flex justify-between items-center">
-                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.24</div>
+                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.26</div>
                         <button onClick={()=>setShowSettings(true)} className="bg-indigo-500 px-3 py-1 rounded text-sm font-bold hover:bg-indigo-400">客户管理</button>
                     </div>
                     {message && (<div className={`fixed top-16 left-4 right-4 p-3 rounded-lg shadow-xl text-white z-[60] text-center ${message.type==='error'?'bg-red-500':'bg-green-500'} animate-bounce`}>{message.text}</div>)}
@@ -1151,7 +1159,15 @@
                                                                 </div>
                                                             </div>
                                                             <div className="text-xs font-mono text-slate-600 space-y-1">
-                                                                {batch.records.map((r,ri) => (<div key={ri} className="flex justify-between"><span className={r.isError?'text-red-600 font-bold':''}>{r.rawInput}</span><span className="text-slate-400">{r.isError?'(待核对)':`¥${r.totalAmount}`}</span></div>))}
+                                                                {batch.records.map((r,ri) => (
+                                                                    <div key={ri} className="flex justify-between gap-2 border-b border-slate-100 last:border-0 pb-1 mb-1 items-start">
+                                                                        <span className={`text-left flex-1 break-all whitespace-pre-wrap ${r.isError?'text-red-600 font-bold':''}`}>
+                                                                            {r.rawInput}
+                                                                            {r.type === 'HK' && <span className="text-red-500 font-bold ml-1 text-xs">(港)</span>}
+                                                                        </span>
+                                                                        <span className="text-slate-400 shrink-0 text-right whitespace-nowrap">{r.isError?'(待核对)':`¥${r.totalAmount}`}</span>
+                                                                    </div>
+                                                                ))}
                                                             </div>
                                                         </div>
                                                     );
