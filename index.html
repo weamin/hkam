@@ -3,214 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>彩票风控系统 v6.38 (单机版)</title>
+    <title>订单管理系统 v6.68</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
     <style>
-        body { -webkit-tap-highlight-color: transparent; padding-bottom: env(safe-area-inset-bottom); background-color: #f8fafc; touch-action: manipulation; }
+        body { -webkit-tap-highlight-color: transparent; padding-bottom: env(safe-area-inset-bottom); background-color: #f3f4f6; touch-action: manipulation; }
         .safe-bottom { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
-        /* v6.36: 补全底部安全区域样式 */
-        .safe-bottom-padding { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .animate-pulse-slow { animation: pulse-slow 3s infinite; }
+        /* 强制层级管理 */
+        #app-header { position: sticky; top: 0; z-index: 50; }
+        #app-content { position: relative; z-index: 1; padding-bottom: 80px; }
+        #app-modal { position: fixed; inset: 0; z-index: 100; background-color: rgba(0,0,0,0.5); }
+        #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; max-width: 28rem; margin: 0 auto; background: white; }
+        
+        .btn-press:active { transform: scale(0.96); opacity: 0.8; }
         input, textarea, select { font-size: 16px !important; } 
-        .modal-overlay { z-index: 5000 !important; }
-        #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; max-width: 28rem; margin: 0 auto; }
         .compact-table th, .compact-table td { padding: 4px 2px; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useCallback, useRef } = React;
+        const { useState, useEffect, useMemo, useCallback } = React;
 
-        // --- 1. 图标组件 ---
-        const Icon = ({ name, className }) => {
-            const icons = {
-                Calculator: <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />,
-                Settings: <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />,
-                Zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />,
-                Trash2: <g><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></g>,
-                Send: <g><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></g>,
-                Eraser: <g><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" /><path d="M22 21H7" /><path d="m5 11 9 9" /></g>,
-                ClipboardCheck: <g><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></g>,
-                Scale: <g><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z" /><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z" /><path d="M7 21h10" /><path d="M12 3v18" /><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" /></g>,
-                FileText: <g><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></g>,
-                Eye: <g><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></g>,
-                Check: <polyline points="20 6 9 17 4 12" />,
-                X: <g><path d="M18 6 6 18" /><path d="M6 6l12 12" /></g>,
-                AlertTriangle: <g><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></g>,
-                ChevronDown: <path d="m6 9 6 6 6-6" />,
-                BookOpen: <g><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></g>,
-                ShieldAlert: <g><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></g>,
-                User: <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />,
-                UserCircle: <g><circle cx="12" cy="12" r="10" /><circle cx="12" cy="10" r="3" /><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" /></g>,
-                Copy: <g><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></g>,
-                Filter: <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />,
-                ArrowRight: <line x1="5" y1="12" x2="19" y2="12" />,
-            };
-            return (
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    {icons[name] || <circle cx="12" cy="12" r="10" />}
-                </svg>
-            );
+        // --- 1. 静态资源 ---
+        const ICON_PATHS = {
+            Calculator: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2",
+            Settings: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z",
+            Zap: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
+            Trash2: "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",
+            Send: "M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z",
+            Eraser: "m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21M22 21H7M5 11l9 9",
+            ClipboardCheck: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2 M9 14l2 2 4-4",
+            Scale: "m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z m-14 0 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z M7 21h10 M12 3v18 M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2",
+            FileText: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
+            Eye: "M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6",
+            Check: "M20 6L9 17l-5-5",
+            X: "M18 6L6 18M6 6l12 12",
+            AlertTriangle: "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z M12 9v4 M12 17h.01",
+            ChevronDown: "m6 9 6 6 6-6",
+            BookOpen: "M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z",
+            ShieldAlert: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10 M12 8v4 M12 16h.01",
+            User: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2",
+            Copy: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2 M8 8h14v14H8z",
+            Filter: "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
+            RefreshCw: "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
         };
 
-        // --- 2. 常量与工具函数 ---
+        const Icon = ({ name, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className || ''}>
+                {ICON_PATHS[name] && <path d={ICON_PATHS[name]}/>}
+                {name==='ClipboardCheck' && <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />}
+                {name==='Copy' && <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>}
+                {!ICON_PATHS[name] && <circle cx="12" cy="12" r="10" />}
+            </svg>
+        );
+
+        // --- 2. 逻辑常量 ---
         const ZODIAC_LIST = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
         const ALL_NUMBERS = Array.from({length: 49}, (_, i) => i + 1);
-
-        const WAVES = {
-            'RED': [1, 2, 7, 8, 12, 13, 18, 19, 23, 24, 29, 30, 34, 35, 40, 45, 46],
-            'BLUE': [3, 4, 9, 10, 14, 15, 20, 25, 26, 31, 36, 37, 41, 42, 47, 48],
-            'GREEN': [5, 6, 11, 16, 17, 21, 22, 27, 28, 32, 33, 38, 39, 43, 44, 49]
-        };
-
-        const isOdd = (n) => n % 2 !== 0;
-        const isEven = (n) => n % 2 === 0;
-        const isSmall = (n) => n >= 1 && n <= 24; 
-        const isBig = (n) => n >= 25 && n <= 49; 
-        const getSumDigit = (n) => Math.floor(n / 10) + (n % 10); 
-
-        const KEYWORDS = {
-            '红波': WAVES.RED, '红': WAVES.RED,
-            '蓝波': WAVES.BLUE, '蓝': WAVES.BLUE,
-            '绿波': WAVES.GREEN, '绿': WAVES.GREEN,
-            '红双': WAVES.RED.filter(isEven), '红单': WAVES.RED.filter(isOdd),
-            '蓝双': WAVES.BLUE.filter(isEven), '蓝单': WAVES.BLUE.filter(isOdd),
-            '绿双': WAVES.GREEN.filter(isEven), '绿单': WAVES.GREEN.filter(isOdd),
-            '单数': ALL_NUMBERS.filter(isOdd), '单': ALL_NUMBERS.filter(isOdd),
-            '双数': ALL_NUMBERS.filter(isEven), '双': ALL_NUMBERS.filter(isEven),
-            '小单': ALL_NUMBERS.filter(n => isSmall(n) && isOdd(n)), '小双': ALL_NUMBERS.filter(n => isSmall(n) && isEven(n)),
-            '大单': ALL_NUMBERS.filter(n => isBig(n) && isOdd(n)), '大双': ALL_NUMBERS.filter(n => isBig(n) && isEven(n)),
-            '合数单': ALL_NUMBERS.filter(n => getSumDigit(n) % 2 !== 0), '合单': ALL_NUMBERS.filter(n => getSumDigit(n) % 2 !== 0),
-            '合数双': ALL_NUMBERS.filter(n => getSumDigit(n) % 2 === 0), '合双': ALL_NUMBERS.filter(n => getSumDigit(n) % 2 === 0),
-        };
-
-        const PATTERN_HK = "香港|香|港";
-        // v6.35: 增加 "噢T"、"溴T" 为澳门关键词
-        const PATTERN_MO = "澳门|澳|门|奥|新澳门|老澳门|噢T|溴T"; 
-        const PATTERN_DUAL_STR = "(香[^0-9a-zA-Z\\u4e00-\\u9fa5]*门)|(港澳)|(港奥)"; 
-        const REGEX_DUAL = new RegExp(PATTERN_DUAL_STR);
-
-        const CH_NUM = "零一二三四五六七八九十百千两";
-        const UNITS = "元米斤块";
+        const WAVES = { 'RED': [1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46], 'BLUE': [3,4,9,10,14,15,20,25,26,31,36,37,41,42,47,48], 'GREEN': [5,6,11,16,17,21,22,27,28,32,33,38,39,43,44,49] };
         
-        // v6.30: 增加 "个号"、"个" 为 "各" 的同义词，支持噪音字符 '＇' 和 '''
-        const BASE_AMOUNT_PARTS = [
-            `((每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。…~＇']*\\d+(\\.\\d+)?[\\s.．。…~＇']*[${UNITS}]?)`, 
-            `(\\d+(\\.\\d+)?[\\s.．。…~＇']*[${UNITS}])`, 
-            `(\\d+(\\.\\d+)?x)`, 
-            `((每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。…~＇']*[${CH_NUM}]+[\\s.．。…~＇']*[${UNITS}]?)`, 
-            `([${CH_NUM}]+[\\s.．。…~＇']*[${UNITS}])`, 
-            `((?<=[\\d\\s])[${CH_NUM}]+(?!([岁尾头])))`, 
-            `(?<=[号])\\d+(\\.\\d+)?` 
-        ].join("|");
+        const isOdd = n => n % 2 !== 0; 
+        const isEven = n => n % 2 === 0;
+        const isSmall = n => n >= 1 && n <= 24; 
+        const isBig = n => n >= 25 && n <= 49; 
+        const getSumDigit = n => Math.floor(n / 10) + (n % 10);
 
+        const KEYWORDS = (() => {
+            const k = {};
+            const odds=ALL_NUMBERS.filter(isOdd), evens=ALL_NUMBERS.filter(isEven);
+            k['单数']=odds; k['单']=odds; k['双数']=evens; k['双']=evens;
+            k['小单']=ALL_NUMBERS.filter(n=>isSmall(n)&&isOdd(n)); k['小双']=ALL_NUMBERS.filter(n=>isSmall(n)&&isEven(n));
+            k['大单']=ALL_NUMBERS.filter(n=>isBig(n)&&isOdd(n)); k['大双']=ALL_NUMBERS.filter(n=>isBig(n)&&isEven(n));
+            k['合数单']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2!==0); k['合单']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2!==0);
+            k['合数双']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2===0); k['合双']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2===0);
+            k['红波']=WAVES.RED; k['红']=WAVES.RED;
+            k['蓝波']=WAVES.BLUE; k['蓝']=WAVES.BLUE;
+            k['绿波']=WAVES.GREEN; k['绿']=WAVES.GREEN;
+            const rO=WAVES.RED.filter(isOdd), rE=WAVES.RED.filter(isEven);
+            const bO=WAVES.BLUE.filter(isOdd), bE=WAVES.BLUE.filter(isEven);
+            const gO=WAVES.GREEN.filter(isOdd), gE=WAVES.GREEN.filter(isEven);
+            k['红单']=rO; k['红波单']=rO; k['红双']=rE; k['红波双']=rE;
+            k['蓝单']=bO; k['蓝波单']=bO; k['蓝双']=bE; k['蓝波双']=bE;
+            k['绿单']=gO; k['绿波单']=gO; k['绿双']=gE; k['绿波双']=gE;
+            k['红绿单']=[...rO, ...gO]; k['红绿双']=[...rE, ...gE];
+            k['红蓝单']=[...rO, ...bO]; k['红蓝双']=[...rE, ...bE];
+            k['蓝绿单']=[...bO, ...gO]; k['蓝绿双']=[...bE, ...gE];
+            return k;
+        })();
+
+        const PATTERN_HK = "香港|香|港"; 
+        const PATTERN_MO = "澳门|澳|门|奥|新澳门|老澳门|噢T|溴T"; 
+        const REGEX_DUAL = new RegExp("([香港][\\s.,，;；]*[澳门奥])|([澳门奥][\\s.,，;；]*[香港])");
+        const CH_NUM = "零一二三四五六七八九十百千两"; 
+        const UNITS = "元米斤块";
+        const BASE_AMOUNT_PARTS = [`((每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。…~＇']*\\d+(\\.\\d+)?[\\s.．。…~＇']*[${UNITS}]?)`, `(\\d+(\\.\\d+)?[\\s.．。…~＇']*[${UNITS}])`, `(\\d+(\\.\\d+)?x)`, `((每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。…~＇']*[${CH_NUM}]+[\\s.．。…~＇']*[${UNITS}]?)`, `([${CH_NUM}]+[\\s.．。…~＇']*[${UNITS}])`, `((?<=[\\d\\s])[${CH_NUM}]+(?!([岁尾头])))`, `(?<=[号])\\d+(\\.\\d+)?`].join("|");
         const REGEX_AMOUNT_NO_SLASH = new RegExp(BASE_AMOUNT_PARTS, 'gi');
-        // 允许斜杠/后跟噪音字符（空格、点、波浪号、单引号等）
         const REGEX_AMOUNT_WITH_SLASH = new RegExp(`${BASE_AMOUNT_PARTS}|(\\/[\\s.．。…~＇']*\\d+(\\.\\d+)?\\s*[${UNITS}]?)`, 'gi');
-        const REGEX_AMOUNT_DELIMITER = REGEX_AMOUNT_WITH_SLASH;
         const REGEX_CHAT_HEADER = /^.*(\(xxf\)|15759804578|[:：]$).*/i;
-        const REGEX_CLIENT_TOTAL = /[（(](?:一共|总计)[^)）]*\d+[^)）]*[）)]/;
+        
+        const REGEX_CLIENT_TOTAL = /(?:[，,。;；]\s*)?(?:[（(]\s*)?(?:合计|总计|一共|打包)\s*[:：]?\s*\d+(?:\.\d+)?(?:\s*[元])?(?:\s*[)）])?/gi;
 
-        const parseChineseNumber = (chNumStr) => {
-            const map = { '零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000 };
-            if (chNumStr.length === 1 && map[chNumStr] !== undefined && map[chNumStr] < 10) return map[chNumStr];
-            let result = 0;
-            if (/[十百千]/.test(chNumStr)) {
-                let currentNum = 0;
-                for (let i = 0; i < chNumStr.length; i++) {
-                    const char = chNumStr[i];
-                    const val = map[char];
-                    if (val >= 10) { if (currentNum === 0) currentNum = 1; result += currentNum * val; currentNum = 0; } 
-                    else if (val !== undefined) { currentNum = val; }
-                }
-                result += currentNum;
+        const parseChineseNumber = (s) => {
+            const map={'零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000};
+            if(s.length===1 && map[s]!==undefined && map[s]<10) return map[s];
+            let res=0, curr=0;
+            for(let i=0;i<s.length;i++){
+                const val=map[s[i]];
+                if(val>=10){ if(curr===0)curr=1; res+=curr*val; curr=0; } else if(val!==undefined) curr=val;
             }
-            return result > 0 ? result : NaN;
+            return (res+curr)||NaN;
         };
 
-        // --- 3. 辅助组件 ---
-        const ActionSheet = ({ title, actions, onCancel }) => {
-            if (!actions) return null;
-            return (
-                <div className="fixed inset-0 bg-black/50 z-[3000] flex items-end sm:items-center justify-center p-4 modal-overlay animate-in fade-in">
-                    <div className="bg-white w-full max-w-sm rounded-xl p-4 space-y-3 shadow-2xl slide-in-from-bottom-10">
-                        {title && <div className="text-center font-bold text-gray-500 pb-2 border-b text-sm">{title}</div>}
-                        {actions.map((action, idx) => (
-                            <button 
-                                key={idx} 
-                                onClick={action.onClick}
-                                className={`w-full py-3.5 rounded-lg font-bold text-center text-lg ${action.className || 'bg-gray-100 text-gray-800'}`}
-                            >
-                                {action.text}
-                            </button>
-                        ))}
-                        <button onClick={onCancel} className="w-full py-3 rounded-lg font-bold text-center text-gray-500 border bg-white mt-2">取消</button>
-                    </div>
-                </div>
-            );
+        const smartMergeLines = (lines) => {
+            const merged=[]; let pending="";
+            const hasAmount=(s)=> /((每个|每号|个号|个|各|买|x|X|号|=|每)[\s.．。…~＇']*[\d零一二三四五六七八九十百千]+)|(\d+[\s.．。…~＇']*[元米斤块])|(\d+[\s.．。…~＇']*x)/.test(s);
+            lines.forEach(line => {
+                const clean = line.trim(); if (!clean) return;
+                if (REGEX_CHAT_HEADER.test(clean)) { if (pending) { merged.push(pending); pending=""; } merged.push(clean); return; }
+                if (hasAmount(clean)) { merged.push(pending + (/^[岁尾头]/.test(clean)?"":" ") + clean); pending=""; }
+                else if (/\d|([鼠牛虎兔龙蛇马羊猴鸡狗猪红蓝绿波单双])/.test(clean)) pending += (pending&&!/^[岁尾头]/.test(clean)?" ":"") + clean;
+                else { if (pending) { merged.push(pending); pending=""; } merged.push(clean); }
+            });
+            if (pending) merged.push(pending); return merged;
         };
 
-        const ConfirmationModal = ({ confirmation }) => {
-            if (!confirmation) return null;
-            return (
-                <div className="fixed inset-0 bg-black/50 z-[3000] flex items-center justify-center p-4 modal-overlay">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4 animate-in zoom-in-95">
-                        <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center"><Icon name="AlertTriangle" className="w-6 h-6 text-red-600"/></div>
-                        <p className="text-center font-bold text-lg text-slate-800 whitespace-pre-line">{confirmation.message}</p>
-                        <div className="flex gap-3 pt-2">
-                            {confirmation.buttons ? (
-                                confirmation.buttons.map((btn, i) => (
-                                    <button key={i} onClick={btn.onClick} className={`flex-1 py-3 rounded font-bold ${btn.className}`}>{btn.text}</button>
-                                ))
-                            ) : (
-                                <>
-                                    <button onClick={confirmation.onCancel} className="flex-1 py-2 rounded border hover:bg-slate-100">取消</button>
-                                    <button onClick={confirmation.onConfirm} className="flex-1 py-2 rounded bg-red-600 text-white hover:bg-red-700">确认</button>
-                                </>
-                            )}
-                        </div>
-                        {confirmation.buttons && (
-                            <button onClick={confirmation.onCancel} className="w-full py-2 text-slate-400 text-sm mt-2 text-center">取消</button>
-                        )}
-                    </div>
-                </div>
-            );
+        const getNumbersForZodiac = (z, currentYear) => {
+            const idx=ZODIAC_LIST.indexOf(currentYear), tIdx=ZODIAC_LIST.indexOf(z);
+            if(idx===-1||tIdx===-1) return [];
+            const offset=(idx-tIdx+12)%12;
+            return Array.from({length:5},(_,i)=>offset+1+i*12).filter(n=>n<=49);
         };
 
-        const CustomerSelectModal = ({ customers, onSelect, onClose }) => (
-            <div className="fixed inset-0 bg-black/50 z-[3000] flex items-center justify-center p-4 modal-overlay animate-in fade-in">
-                <div className="bg-white w-full max-w-sm rounded-xl p-4 max-h-[80vh] flex flex-col shadow-2xl">
-                    <div className="flex justify-between items-center mb-4 border-b pb-2">
-                        <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Icon name="User" className="w-5 h-5 text-indigo-600"/> 选择客户</h3>
-                        <button onClick={onClose}><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto space-y-2">
-                        {customers.map(c => (
-                            <button key={c.id} onClick={() => onSelect(c.name)} className="w-full text-left p-3 rounded-lg hover:bg-indigo-50 border border-slate-100 font-bold text-slate-700 flex items-center justify-between active:bg-indigo-100 transition-colors">
-                                <span>{c.name}</span>
-                                <span className="text-xs text-slate-400 font-normal">赔{c.odds} / 退{c.rebate*100}%</span>
-                            </button>
-                        ))}
-                    </div>
-                    <button onClick={onClose} className="mt-4 w-full py-3 border rounded-lg text-slate-500 font-medium">取消</button>
-                </div>
+        // --- 3. 模态框组件 ---
+        const ModalContainer = ({ children }) => (
+            <div id="app-modal" className="flex items-center justify-center p-4 animate-fade-in">
+                {children}
             </div>
         );
 
-        const MessageToast = ({ message }) => {
-            if (!message) return null;
-            const color = message.type === 'success' ? 'bg-green-500' : message.type === 'warning' ? 'bg-orange-500' : 'bg-red-500';
-            return <div className={`fixed top-4 right-4 z-[4000] flex gap-3 p-4 rounded-lg shadow-xl text-white ${color}`}><Icon name="Check" className="w-5 h-5"/><span>{message.text}</span></div>;
-        };
+        const ActionSheet = ({ title, actions, onCancel }) => !actions ? null : (
+            <ModalContainer>
+                <div className="bg-white w-full max-w-sm rounded-xl p-4 space-y-3 shadow-2xl mt-auto sm:mt-0">
+                    {title && <div className="text-center font-bold text-gray-500 pb-2 border-b text-sm">{title}</div>}
+                    {actions.map((a, i) => <button key={i} onClick={a.onClick} className={`w-full py-3.5 rounded-lg font-bold text-center text-lg btn-press ${a.className||'bg-gray-100 text-gray-800'}`}>{a.text}</button>)}
+                    <button onClick={onCancel} className="w-full py-3 rounded-lg font-bold text-center text-gray-500 border bg-white mt-2 btn-press">取消</button>
+                </div>
+            </ModalContainer>
+        );
+
+        const ConfirmationModal = ({ confirmation }) => !confirmation ? null : (
+            <ModalContainer>
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+                    <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center"><Icon name="AlertTriangle" className="w-6 h-6 text-red-600"/></div>
+                    <p className="text-center font-bold text-lg text-slate-800 whitespace-pre-line">{confirmation.message}</p>
+                    <div className="flex gap-3 pt-2">
+                        <button onClick={confirmation.onCancel} className="flex-1 py-2 rounded border hover:bg-slate-100 btn-press">取消</button>
+                        <button onClick={confirmation.onConfirm} className="flex-1 py-2 rounded bg-red-600 text-white hover:bg-red-700 btn-press">确认</button>
+                    </div>
+                </div>
+            </ModalContainer>
+        );
+
+        const CustomerSelectModal = ({ customers, onSelect, onClose }) => (
+            <ModalContainer>
+                <div className="bg-white w-full max-w-sm rounded-xl p-4 max-h-[80vh] flex flex-col shadow-2xl">
+                    <div className="flex justify-between items-center mb-4 border-b pb-2">
+                        <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Icon name="User" className="w-5 h-5 text-indigo-600"/> 选择客户</h3>
+                        <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto space-y-2">
+                        {customers.map(c => <button key={c.id} onClick={()=>onSelect(c.name)} className="w-full text-left p-3 rounded-lg hover:bg-indigo-50 border border-slate-100 font-bold text-slate-700 flex items-center justify-between active:bg-indigo-100 transition-colors btn-press"><span>{c.name}</span><span className="text-xs text-slate-400 font-normal">赔{c.odds} / 退{c.rebate*100}%</span></button>)}
+                    </div>
+                    <button onClick={onClose} className="mt-4 w-full py-3 border rounded-lg text-slate-500 font-medium btn-press">取消</button>
+                </div>
+            </ModalContainer>
+        );
 
         const MobileRiskTable = ({title,color,data,total}) => (
             <div className="bg-white rounded shadow border border-slate-200 flex flex-col h-full overflow-hidden">
@@ -218,15 +191,7 @@
                 <div className="flex-1 overflow-y-auto">
                     <table className="w-full text-xs text-center">
                         <thead className="bg-slate-50 text-slate-400"><tr><th className="py-1">号</th><th>注</th><th>亏</th></tr></thead>
-                        <tbody>
-                            {data.map(d=>(
-                                <tr key={d.num} className={`border-b last:border-0 ${d.customerPL>0?'bg-red-50':''}`}>
-                                    <td className="py-2 font-bold">{d.num}</td>
-                                    <td className="text-slate-500">{d.betAmt>0?d.betAmt:'-'}</td>
-                                    <td className={d.customerPL>0?'text-red-600 font-bold':'text-green-600'}>{Math.round(d.customerPL)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
+                        <tbody>{data.map(d=><tr key={d.num} className={`border-b last:border-0 ${d.customerPL>0?'bg-red-50':''}`}><td className="py-2 font-bold">{d.num}</td><td className="text-slate-500">{d.betAmt>0?d.betAmt:'-'}</td><td className={d.customerPL>0?'text-red-600 font-bold':'text-green-600'}>{Math.round(d.customerPL)}</td></tr>)}</tbody>
                     </table>
                 </div>
             </div>
@@ -234,62 +199,40 @@
         
         const EditOrderModal = ({ batchId, onClose, onSave, bets, parseContentForSegments }) => {
             const recs = bets.filter(b=>b.batchId===batchId);
-            const rawLines = Array.from(new Set(recs.map(r=>r.rawInput))).filter(l=>l);
-            const [lines, setLines] = useState(rawLines);
+            const [lines, setLines] = useState(Array.from(new Set(recs.map(r=>r.rawInput))).filter(l=>l));
             const header = recs[0]?.originalHeader;
-            const clientTotal = recs[0]?.originalTotal;
-            const fullText = recs[0]?.fullText; 
-            const originalDisplay = fullText || rawLines.join('\n');
-
+            const originalDisplay = recs[0]?.fullText || lines.join('\n');
             const stats = lines.map(l => {
                 const segs = parseContentForSegments(l, '0');
                 const valid = segs.length>0 && segs.every(s=>s.isValid && !s.isSuspicious);
-                const amt = segs.reduce((a,b)=>a + b.totalBetCount*b.amount*(b.isDualBet?2:1), 0);
-                return { valid, amt };
+                return { valid: valid && !segs.some(s=>s.hasUnknown), amt: segs.reduce((a,b)=>a + b.totalBetCount*b.amount*(b.isDualBet?2:1), 0) };
             });
-            const total = stats.reduce((a,b)=>a+b.amt,0);
+            const renderHighlightedTokens = (text) => {
+                const tokens = text.split(new RegExp(`([\\s.,，;；*\\/。．…~＇' -]+|[${ZODIAC_LIST.join('')}])`));
+                return tokens.map((t, idx) => {
+                    if (!t) return null;
+                    if (/^[.,，;；*\/。．…~＇' -]+$/.test(t)) return <span key={idx} className="text-slate-400">{t}</span>;
+                    let isValid = !isNaN(parseInt(t)) ? (parseInt(t)>=1&&parseInt(t)<=49) : (KEYWORDS[t.toUpperCase()] || ZODIAC_LIST.includes(t) || /^[岁尾头]$/.test(t.slice(-1)) || ['各','买','x','X','号','=','每','元','米','斤','块','个','个号'].some(k=>t.includes(k)) || /^合(数)?\d+$/.test(t));
+                    return <span key={idx} className={`inline-block px-1 rounded mx-0.5 ${isValid?'bg-green-100 text-green-800':'bg-red-600 text-white font-bold'}`}>{t}</span>;
+                });
+            };
             return (
-                <div className="fixed inset-0 bg-black/80 z-[3000] flex items-center justify-center p-4 animate-in fade-in modal-overlay">
+                <ModalContainer>
                     <div className="bg-white w-full h-[80vh] rounded-xl flex flex-col overflow-hidden">
-                        <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-                            <div className="font-bold text-lg">订单校对 <div className="text-xs font-normal text-slate-500 mt-1">{header}</div></div>
-                            <div className="text-indigo-600 font-bold text-xl">¥{total}</div>
-                        </div>
+                        <div className="p-4 border-b flex justify-between items-center bg-slate-50"><div className="font-bold text-lg">订单校对 <div className="text-xs font-normal text-slate-500 mt-1">{header}</div></div><div className="text-indigo-600 font-bold text-xl">¥{stats.reduce((a,b)=>a+b.amt,0)}</div></div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                            <div className="bg-yellow-50 p-3 rounded text-xs text-slate-600 border border-yellow-100">
-                                <strong className="block mb-1">原始记录:</strong>
-                                <pre className="whitespace-pre-wrap font-mono break-all">{originalDisplay}</pre>
-                                {clientTotal && <div className="mt-1 text-orange-600 font-bold">客户手写: {clientTotal}</div>}
-                            </div>
-                            {lines.map((l,i)=>(
-                                <div key={i} className={`flex gap-2 p-2 rounded border ${!stats[i].valid?'border-red-300 bg-red-50':'border-slate-200'}`}>
-                                    <span className="text-slate-400 w-4 pt-2 text-xs">{i+1}</span>
-                                    <textarea 
-                                        value={l} 
-                                        onChange={e=>{const n=[...lines];n[i]=e.target.value;setLines(n)}} 
-                                        className="flex-1 bg-transparent outline-none text-sm resize-none h-auto overflow-hidden break-all"
-                                        rows={1}
-                                        style={{minHeight:'24px'}}
-                                    />
-                                    <div className="text-right">
-                                        <div className="text-xs text-slate-400 font-bold">¥{stats[i].amt}</div>
-                                        <button onClick={()=>{const n=[...lines];n.splice(i,1);setLines(n)}} className="text-red-400 mt-1"><Icon name="X" className="w-4 h-4"/></button>
-                                    </div>
-                                </div>
-                            ))}
-                            <button onClick={()=>setLines([...lines,''])} className="w-full py-3 border-2 border-dashed rounded text-slate-400 font-bold">+ 添加行</button>
+                            <div className="bg-yellow-50 p-3 rounded text-xs text-slate-600 border border-yellow-100"><strong className="block mb-1">原始记录:</strong><pre className="whitespace-pre-wrap font-mono break-all">{originalDisplay}</pre>{recs[0]?.originalTotal && <div className="mt-1 text-orange-600 font-bold">客户手写: {recs[0].originalTotal}</div>}</div>
+                            {lines.map((l,i)=><div key={i} className="space-y-1"><div className={`flex gap-2 p-2 rounded border ${!stats[i].valid?'border-red-300 bg-red-50':'border-slate-200'}`}><span className="text-slate-400 w-4 pt-2 text-xs">{i+1}</span><textarea value={l} onChange={e=>{const n=[...lines];n[i]=e.target.value;setLines(n)}} className="flex-1 bg-transparent outline-none text-sm resize-none h-auto overflow-hidden break-all" rows={1} style={{minHeight:'24px'}}/><div className="text-right"><div className="text-xs text-slate-400 font-bold">¥{stats[i].amt}</div><button onClick={()=>{const n=[...lines];n.splice(i,1);setLines(n)}} className="text-red-400 mt-1"><Icon name="X" className="w-4 h-4"/></button></div></div>{!stats[i].valid && <div className="text-xs p-2 ml-6 bg-red-50 border border-red-100 rounded"><div className="text-red-500 mb-1 font-bold">纠错预览:</div><div className="flex flex-wrap items-center">{renderHighlightedTokens(l)}</div></div>}</div>)}
+                            <button onClick={()=>setLines([...lines,''])} className="w-full py-3 border-2 border-dashed rounded text-slate-400 font-bold btn-press">+ 添加行</button>
                         </div>
-                        <div className="p-4 border-t flex gap-3">
-                            <button onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold">取消</button>
-                            <button onClick={()=>onSave(batchId, lines.filter(x=>x.trim()))} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow">保存修改</button>
-                        </div>
+                        <div className="p-4 border-t flex gap-3"><button onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold btn-press">取消</button><button onClick={()=>onSave(batchId, lines.filter(x=>x.trim()))} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow btn-press">保存修改</button></div>
                     </div>
-                </div>
+                </ModalContainer>
             );
         };
 
         const RawRecordModal = ({ batch, onClose }) => (
-            <div className="fixed inset-0 bg-black/80 z-[3000] flex items-center justify-center p-4 modal-overlay">
+            <ModalContainer>
                 <div className="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl">
                     <h3 className="font-bold text-lg mb-4 border-b pb-2">原始下单记录</h3>
                     <div className="bg-slate-100 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto text-slate-700">
@@ -297,759 +240,307 @@
                         {batch.originalTotal && <div className="text-orange-600 font-bold mb-2">手写总计: {batch.originalTotal}</div>}
                         <pre className="whitespace-pre-wrap break-all">{batch.fullText || batch.lines.join('\n')}</pre>
                     </div>
-                    <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow">关闭</button>
+                    <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow btn-press">关闭</button>
                 </div>
-            </div>
+            </ModalContainer>
         );
 
         const HedgingModal = ({ onClose, riskStats, riskFilter, customers, bets, showAlert }) => {
             const [activeType, setActiveType] = useState(riskFilter==='HK'?'HK':'MO');
-            const [hedgingTarget, setHedgingTarget] = useState('ALL'); // v6.37: Direct target (ALL or name)
+            const [hedgingTarget, setHedgingTarget] = useState('ALL');
             const [maxLossLimit, setMaxLossLimit] = useState('0');
             const [maxBetLimit, setMaxBetLimit] = useState('500');
             const [copyMsg, setCopyMsg] = useState('');
+            const [transferHistory, setTransferHistory] = useState({});
 
-            const activeCustomers = useMemo(() => {
-                const names = new Set(bets.map(b => b.customerName));
-                return Array.from(names).sort(); 
-            }, [bets]);
+            const activeCustomers = useMemo(() => Array.from(new Set(bets.map(b => b.customerName))).sort(), [bets]);
+            useEffect(() => setTransferHistory({}), [activeType]);
 
             const currentRiskStats = useMemo(() => {
                 let filtered = bets.filter(b => !b.isError);
                 if (hedgingTarget !== 'ALL') filtered = filtered.filter(b => b.customerName === hedgingTarget);
-                
                 const stats = { hk:Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0})), mo:Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0})) };
                 let [hkP,hkR,moP,moR] = [0,0,0,0];
-
                 filtered.forEach(b => {
                     const c = customers.find(cust=>cust.name===b.customerName)||{odds:47.5,rebate:0.1};
                     const reb = b.totalAmount*c.rebate;
                     if(b.type==='HK'){hkP+=b.totalAmount;hkR+=reb}else{moP+=b.totalAmount;moR+=reb}
-                    b.numbers.forEach(n=>{if(n>=1&&n<=49){
-                        const t=b.type==='HK'?stats.hk[n-1]:stats.mo[n-1]; t.betAmt+=b.amountPerNumber; t.payout+=b.amountPerNumber*c.odds;
-                    }});
+                    b.numbers.forEach(n=>{if(n>=1&&n<=49){const t=b.type==='HK'?stats.hk[n-1]:stats.mo[n-1]; t.betAmt+=b.amountPerNumber; t.payout+=b.amountPerNumber*c.odds;}});
                 });
                 const calc = (l,pool,reb)=>l.map(i=>({...i, customerPL:(i.payout+reb)-pool})).sort((a,b)=>b.betAmt-a.betAmt);
                 return { hk:calc(stats.hk,hkP,hkR), mo:calc(stats.mo,moP,moR), hkPool:hkP, hkRebate:hkR, moPool:moP, moRebate:moR };
             }, [bets, customers, hedgingTarget]);
 
             const data = activeType === 'HK' ? currentRiskStats.hk : currentRiskStats.mo;
-            const pool = activeType === 'HK' ? currentRiskStats.hkPool : currentRiskStats.moPool;
             const maxWinForHouse = -Math.min(...data.map(d => d.customerPL));
             const maxLossForHouse = Math.max(...data.map(d => d.customerPL));
-
             useEffect(() => { if (maxLossLimit === '0' && maxWinForHouse > 0) setMaxLossLimit((maxWinForHouse * 0.9).toFixed(0)); }, [maxWinForHouse]);
             
-            const copySuggestions = () => {
-                const lines = data
-                    .map(d => {
-                        let advice = 0;
-                        if (d.customerPL > parseFloat(maxLossLimit)) advice = Math.max(advice, (d.customerPL - parseFloat(maxLossLimit))/46.5);
-                        if (d.betAmt > parseFloat(maxBetLimit)) advice = Math.max(advice, d.betAmt - parseFloat(maxBetLimit));
-                        advice = Math.round(advice);
-                        return advice > 0 ? `${d.num}=${advice}` : null;
-                    })
-                    .filter(l => l !== null);
-
-                if (lines.length === 0) {
-                    showAlert("当前没有需要转出的号码", "warning");
-                } else {
-                    const text = lines.join(' '); // 用空格连接
-                    const el = document.createElement('textarea');
-                    el.value = text; document.body.appendChild(el); el.select();
-                    document.execCommand('copy'); document.body.removeChild(el);
-                    setCopyMsg('已复制!'); setTimeout(()=>setCopyMsg(''), 2000);
-                }
-            };
-
-            const processedData = data.map(d => {
-                let advice = 0;
-                if (d.customerPL > parseFloat(maxLossLimit)) advice = Math.max(advice, (d.customerPL - parseFloat(maxLossLimit))/46.5);
-                if (d.betAmt > parseFloat(maxBetLimit)) advice = Math.max(advice, d.betAmt - parseFloat(maxBetLimit));
-                return { ...d, advice: Math.round(advice) };
-            });
-
-            const totalAdvice = processedData.reduce((acc, d) => acc + d.advice, 0);
-
-            const displayData = processedData.map(d => {
-                 const newPL = d.customerPL - (d.advice * 47.5) + totalAdvice;
-                 return { ...d, postTransferPL: newPL };
-            });
-
-            const maxWinPostTransfer = -Math.min(...displayData.map(d=>d.postTransferPL));
-            const maxLossPostTransfer = Math.max(...displayData.map(d=>d.postTransferPL));
+            const processedData = useMemo(() => data.map(d => {
+                let totalAdvice = 0;
+                if (d.customerPL > parseFloat(maxLossLimit)) totalAdvice = Math.max(totalAdvice, (d.customerPL - parseFloat(maxLossLimit))/46.5);
+                if (d.betAmt > parseFloat(maxBetLimit)) totalAdvice = Math.max(totalAdvice, d.betAmt - parseFloat(maxBetLimit));
+                return { ...d, totalAdvice: Math.round(totalAdvice), advice: Math.max(0, Math.round(totalAdvice) - (transferHistory[d.num] || 0)), alreadyTransferred: transferHistory[d.num] || 0 };
+            }), [data, maxLossLimit, maxBetLimit, transferHistory]);
             
-            // v6.37: Force sort by betAmt descending
-            const sortedDisplayData = [...displayData].sort((a,b) => b.betAmt - a.betAmt);
-
-            const renderBankerPL = (custPL) => {
-                const val = -1 * custPL;
-                const rounded = Math.round(val);
-                const color = val < 0 ? 'text-red-500' : 'text-green-600';
-                const sign = val > 0 ? '+' : '';
-                return <span className={color}>{sign}{rounded}</span>;
+            const copyAndMarkTransferred = () => {
+                const lines = processedData.filter(d => d.advice > 0).map(d => `${d.num}=${d.advice}`);
+                if (lines.length === 0) { showAlert("无新增风险单", "warning"); return; }
+                const el = document.createElement('textarea'); el.value = lines.join(' '); document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+                const newHistory = { ...transferHistory }; processedData.forEach(d => { if (d.advice > 0) newHistory[d.num] = (newHistory[d.num] || 0) + d.advice; });
+                setTransferHistory(newHistory); setCopyMsg('已累加标记!'); setTimeout(()=>setCopyMsg(''), 2000);
             };
+            
+            const displayData = processedData.map(d => ({ ...d, postTransferPL: d.customerPL - (d.totalAdvice * 47.5) + processedData.reduce((acc, x) => acc + x.totalAdvice, 0) })).sort((a,b) => b.betAmt - a.betAmt);
+            const renderBankerPL = (v) => <span className={-v<0?'text-red-500':'text-green-600'}>{-v>0?'+':''}{Math.round(-v)}</span>;
 
             return (
-                <div className="fixed inset-0 bg-white z-[5000] flex flex-col animate-in fade-in w-full h-[100dvh] supports-[height:100dvh]:h-[100dvh]">
-                    <div className="p-3 bg-slate-100 border-b flex justify-between items-center shrink-0">
-                        <h3 className="font-bold flex items-center gap-2 text-base"><Icon name="Scale" className="w-5 h-5"/> 智能转单 (全屏版)</h3>
-                        <button onClick={onClose} className="p-2 -mr-2"><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
-                    </div>
-                    
-                    <div className="bg-blue-50 p-2 text-xs grid grid-cols-2 gap-x-4 border-b border-blue-100 shrink-0">
-                            <div>
-                            <div className="flex justify-between items-end">
-                                <span className="text-slate-500">最高可赢:</span>
-                                <span className="text-green-600 font-bold text-base">+¥{Math.round(maxWinForHouse).toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between items-end mt-1 border-t border-blue-100 pt-1">
-                                <span className="text-purple-500 font-bold">转后可赢:</span>
-                                <span className="text-purple-700 font-bold text-base">+¥{Math.round(maxWinPostTransfer).toLocaleString()}</span>
-                            </div>
-                            </div>
-                            <div>
-                            <div className="flex justify-between items-end">
-                                <span className="text-slate-500">最大风险:</span>
-                                <span className="text-red-600 font-bold text-base">¥{Math.round(maxLossForHouse).toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between items-end mt-1 border-t border-blue-100 pt-1">
-                                <span className="text-orange-500 font-bold">转后风险:</span>
-                                <span className="text-orange-600 font-bold text-base">¥{Math.round(maxLossPostTransfer).toLocaleString()}</span>
-                            </div>
-                            </div>
-                    </div>
-
-                    <div className="p-2 space-y-2 border-b bg-white shrink-0 text-sm">
-                        <div className="flex gap-2 items-center">
-                            {/* v6.37: Simplified Single Select Dropdown */}
-                            <div className="flex-1">
-                                <select 
-                                    className="w-full border rounded px-2 py-1.5 bg-white text-xs font-bold text-slate-700" 
-                                    value={hedgingTarget} 
-                                    onChange={e=>setHedgingTarget(e.target.value)}
-                                >
-                                    <option value="ALL">全部订单</option>
-                                    <optgroup label="下注客户">
-                                        {activeCustomers.map(name => <option key={name} value={name}>{name}</option>)}
-                                    </optgroup>
-                                </select>
-                            </div>
-                            <div className="flex border rounded overflow-hidden shrink-0 text-xs">
-                                <button onClick={()=>setActiveType('MO')} className={`px-2 py-1.5 ${activeType==='MO'?'bg-green-500 text-white':'bg-slate-100 text-slate-600'}`}>澳门</button>
-                                <button onClick={()=>setActiveType('HK')} className={`px-2 py-1.5 ${activeType==='HK'?'bg-red-500 text-white':'bg-slate-100 text-slate-600'}`}>香港</button>
-                            </div>
+                <ModalContainer>
+                    <div className="bg-white z-[5000] flex flex-col w-full h-[100dvh]">
+                        <div className="p-3 bg-slate-100 border-b flex justify-between items-center shrink-0"><h3 className="font-bold flex items-center gap-2 text-base"><Icon name="Scale" className="w-5 h-5"/> 智能转单 (累加版)</h3><button onClick={onClose} className="btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button></div>
+                        <div className="bg-blue-50 p-2 text-xs grid grid-cols-2 gap-x-4 border-b border-blue-100 shrink-0">
+                            <div><div className="flex justify-between"><span>最高可赢:</span><span className="text-green-600 font-bold">+¥{Math.round(maxWinForHouse).toLocaleString()}</span></div><div className="flex justify-between mt-1 border-t border-blue-100 pt-1"><span className="text-purple-500">转后可赢:</span><span className="text-purple-700 font-bold">+¥{Math.round(-Math.min(...displayData.map(d=>d.postTransferPL))).toLocaleString()}</span></div></div>
+                            <div><div className="flex justify-between"><span>最大风险:</span><span className="text-red-600 font-bold">¥{Math.round(maxLossForHouse).toLocaleString()}</span></div><div className="flex justify-between mt-1 border-t border-blue-100 pt-1"><span className="text-orange-500">转后风险:</span><span className="text-orange-600 font-bold">¥{Math.round(Math.max(...displayData.map(d=>d.postTransferPL))).toLocaleString()}</span></div></div>
                         </div>
-                        <div className="flex gap-2 items-center bg-slate-50 p-1.5 rounded">
-                            <div className="flex-1 flex items-center gap-1">
-                                <span className="text-slate-500 text-xs whitespace-nowrap">建议止损:</span>
-                                <input type="number" value={maxLossLimit} onChange={e=>setMaxLossLimit(e.target.value)} className="w-full border-b border-slate-300 bg-transparent text-center font-bold text-red-600 text-sm p-0 focus:ring-0"/>
-                            </div>
-                            <div className="w-px h-4 bg-slate-300"></div>
-                            <div className="flex-1 flex items-center gap-1">
-                                <span className="text-slate-500 text-xs whitespace-nowrap">最大吃码:</span>
-                                <input type="number" value={maxBetLimit} onChange={e=>setMaxBetLimit(e.target.value)} className="w-full border-b border-slate-300 bg-transparent text-center font-bold text-indigo-600 text-sm p-0 focus:ring-0"/>
-                            </div>
+                        <div className="p-2 space-y-2 border-b bg-white shrink-0 text-sm">
+                            <div className="flex gap-2 items-center"><div className="flex-1"><select className="w-full border rounded px-2 py-1.5 bg-white text-xs font-bold" value={hedgingTarget} onChange={e=>setHedgingTarget(e.target.value)}><option value="ALL">全部订单</option><optgroup label="下注客户">{activeCustomers.map(n=><option key={n} value={n}>{n}</option>)}</optgroup></select></div><div className="flex border rounded overflow-hidden shrink-0 text-xs"><button onClick={()=>setActiveType('MO')} className={`px-2 py-1.5 ${activeType==='MO'?'bg-green-500 text-white':'bg-slate-100'}`}>澳门</button><button onClick={()=>setActiveType('HK')} className={`px-2 py-1.5 ${activeType==='HK'?'bg-red-500 text-white':'bg-slate-100'}`}>香港</button></div></div>
+                            <div className="flex gap-2 items-center bg-slate-50 p-1.5 rounded"><div className="flex-1 flex items-center gap-1"><span className="text-xs whitespace-nowrap">建议止损:</span><input type="number" value={maxLossLimit} onChange={e=>setMaxLossLimit(e.target.value)} className="w-full border-b bg-transparent text-center font-bold text-red-600 text-sm"/></div><div className="w-px h-4 bg-slate-300"></div><div className="flex-1 flex items-center gap-1"><span className="text-xs whitespace-nowrap">最大吃码:</span><input type="number" value={maxBetLimit} onChange={e=>setMaxBetLimit(e.target.value)} className="w-full border-b bg-transparent text-center font-bold text-indigo-600 text-sm"/></div></div>
                         </div>
+                        <div className="bg-orange-50 px-3 py-2 text-xs flex justify-between items-center border-b border-orange-100 text-orange-800 font-bold"><span>本次: ¥{processedData.reduce((a,d)=>a+d.advice,0)}</span><span>已转: ¥{Object.values(transferHistory).reduce((a,b)=>a+b,0)}</span></div>
+                        <div className="flex-1 overflow-y-auto p-0 bg-slate-50">
+                            <table className="w-full text-xs text-center border-collapse compact-table"><thead className="bg-slate-200 sticky top-0 z-10"><tr><th className="w-8">号</th><th>本次</th><th>已转</th><th>注</th><th>转后</th></tr></thead>
+                                <tbody className="divide-y divide-slate-200 bg-white">{displayData.map(d=><tr key={d.num} className={d.advice>0?'bg-orange-50':''}><td className="font-bold border-r bg-slate-50">{d.num}</td><td className="text-orange-600 font-bold">{d.advice||'-'}</td><td className="text-slate-400">{d.alreadyTransferred||'-'}</td><td className="text-slate-400">{d.betAmt||'-'}</td><td className="font-bold">{renderBankerPL(d.postTransferPL)}</td></tr>)}</tbody>
+                            </table>
+                        </div>
+                        <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding flex gap-2"><button onClick={()=>setTransferHistory({})} className="px-3 bg-slate-100 border rounded-xl btn-press"><Icon name="RefreshCw" className="w-5 h-5"/></button><button onClick={onClose} className="w-20 bg-slate-100 border rounded-xl font-bold btn-press">关闭</button><button onClick={copyAndMarkTransferred} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow flex items-center justify-center gap-2 btn-press"><Icon name="ClipboardCheck" className="w-5 h-5"/> {copyMsg||`复制 (${processedData.filter(d=>d.advice>0).length})`}</button></div>
                     </div>
-
-                    <div className="flex-1 overflow-y-auto p-0 bg-slate-50">
-                            <table className="w-full text-xs text-center border-collapse compact-table">
-                            <thead className="bg-slate-200 text-slate-600 sticky top-0 z-10 shadow-sm text-[10px]">
-                                <tr>
-                                    <th className="w-8">号</th>
-                                    <th>建议转出</th>
-                                    <th>当前下注</th>
-                                    <th>风险盈亏</th>
-                                    <th>转后盈亏</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 bg-white text-[11px]">
-                                {sortedDisplayData.map((d) => (
-                                    <tr key={d.num} className={`hover:bg-slate-50 ${d.advice > 0 ? 'bg-orange-50' : ''}`}>
-                                        <td className="font-bold text-slate-700 border-r border-slate-100 bg-slate-50">{d.num}</td>
-                                        <td className="text-orange-600 font-bold">{d.advice > 0 ? d.advice : '-'}</td>
-                                        <td className="text-slate-400">{d.betAmt || '-'}</td>
-                                        <td className="font-bold">{renderBankerPL(d.customerPL)}</td>
-                                        <td className="font-bold">{renderBankerPL(d.postTransferPL)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding flex gap-3">
-                        <button onClick={onClose} className="w-24 bg-slate-100 text-slate-600 border border-slate-300 py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-transform">
-                            关闭
-                        </button>
-                        <button onClick={copySuggestions} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
-                            <Icon name="ClipboardCheck" className="w-5 h-5"/> 
-                            {copyMsg || `复制转单 (${displayData.filter(d=>d.advice>0).length})`}
-                        </button>
-                    </div>
-                </div>
+                </ModalContainer>
             );
         };
 
         // --- 主程序 App ---
         function App() {
-            const [bets, setBets] = useState(() => { const s = localStorage.getItem('lottery_bets_v5'); return s ? JSON.parse(s) : []; });
-            const [customers, setCustomers] = useState(() => {
-                const s = localStorage.getItem('lottery_customers');
-                if (s) return JSON.parse(s);
-                // v6.13: 默认初始客户
-                return [
-                    {id:'def_1', name:'张三', customerType:'客户', odds:47.5, rebate:0.02, aliases:[]},
-                    {id:'def_2', name:'李四', customerType:'客户', odds:47.5, rebate:0.03, aliases:[]},
-                    {id:'def_3', name:'王五', customerType:'客户', odds:48.0, rebate:0.0, aliases:[]}
-                ];
+            // 安全的初始数据读取
+            const [bets, setBets] = useState(() => { 
+                try {
+                    const s = localStorage.getItem('lottery_bets_v5'); 
+                    const p = (s && s!=='undefined') ? JSON.parse(s) : [];
+                    return Array.isArray(p) ? p.filter(b => b && typeof b === 'object' && Array.isArray(b.numbers)) : [];
+                } catch(e) { return []; }
             });
+            const [customers, setCustomers] = useState(() => { 
+                try {
+                    const s = localStorage.getItem('lottery_customers'); 
+                    const p = (s && s!=='undefined') ? JSON.parse(s) : null;
+                    if (!Array.isArray(p)) return [{id:'def_1',name:'张三',odds:47.5,rebate:0.02},{id:'def_2',name:'李四',odds:47.5,rebate:0.03}];
+                    return p.filter(c => c && c.name); 
+                } catch(e) { 
+                    return [{id:'def_1',name:'张三',odds:47.5,rebate:0.02},{id:'def_2',name:'李四',odds:47.5,rebate:0.03}]; 
+                }
+            });
+            const [currentYearZodiac, setCurrentYearZodiac] = useState(() => localStorage.getItem('lottery_year_zodiac') || '蛇');
             
-            const [currentYearZodiac, setCurrentYearZodiac] = useState('蛇');
-            const [inputCustomer, setInputCustomer] = useState(''); 
-            const [inputContent, setInputContent] = useState('');
+            const [inputCustomer, setInputCustomer] = useState(''); const [inputContent, setInputContent] = useState('');
             const [defaultAmount, setDefaultAmount] = useState('');
-            const [activeTab, setActiveTab] = useState('input'); 
-            const [showSettings, setShowSettings] = useState(false);
-            const [showCustomerModal, setShowCustomerModal] = useState(false); 
-            const [actionSheet, setActionSheet] = useState(null); 
-            const [tempCustomers, setTempCustomers] = useState([]);
-            const [batchToEdit, setBatchToEdit] = useState(null);
-            const [message, setMessage] = useState(null);
-            const [confirmation, setConfirmation] = useState(null);
-            const [showHedgingModal, setShowHedgingModal] = useState(false);
-            
-            // 对账相关
-            const [winningNumberHK, setWinningNumberHK] = useState('');
-            const [winningNumberMO, setWinningNumberMO] = useState('');
-            const [expandedReconciliation, setExpandedReconciliation] = useState(null);
-            const [viewingRawBatch, setViewingRawBatch] = useState(null);
-            const [previewBatches, setPreviewBatches] = useState([]);
-            const [riskFilter, setRiskFilter] = useState('ALL'); 
-            
-            // v6.17: 账本页面筛选
-            const [bookMode, setBookMode] = useState('ALL'); // 'ALL' or 'SINGLE'
-            const [bookTarget, setBookTarget] = useState('');
+            const [activeTab, setActiveTab] = useState('input'); const [showSettings, setShowSettings] = useState(false);
+            const [showCustomerModal, setShowCustomerModal] = useState(false); const [actionSheet, setActionSheet] = useState(null);
+            const [tempCustomers, setTempCustomers] = useState([]); const [batchToEdit, setBatchToEdit] = useState(null);
+            const [message, setMessage] = useState(null); const [confirmation, setConfirmation] = useState(null);
+            const [showHedgingModal, setShowHedgingModal] = useState(false); const [textPreview, setTextPreview] = useState(null);
+            const [winningNumberHK, setWinningNumberHK] = useState(''); const [winningNumberMO, setWinningNumberMO] = useState('');
+            const [expandedReconciliation, setExpandedReconciliation] = useState(null); const [viewingRawBatch, setViewingRawBatch] = useState(null);
+            const [previewBatches, setPreviewBatches] = useState([]); const [riskFilter, setRiskFilter] = useState('ALL');
+            const [bookMode, setBookMode] = useState('ALL'); const [bookTarget, setBookTarget] = useState('');
 
-            // v6.23: 文本预览弹窗状态
-            const [textPreview, setTextPreview] = useState(null);
+            // 二次清洗（可选，主要为了清理内存中的脏数据）
+            useEffect(() => {
+                setBets(prev => {
+                    const valid = prev.filter(b => b && typeof b === 'object' && Array.isArray(b.numbers));
+                    return valid.length !== prev.length ? valid : prev;
+                });
+            }, []);
 
             const showAlert = (text, type='error') => { setMessage({text,type}); setTimeout(()=>setMessage(null),3000); };
+            useEffect(() => { if(bets) localStorage.setItem('lottery_bets_v5', JSON.stringify(bets)) }, [bets]);
+            useEffect(() => { if(currentYearZodiac) localStorage.setItem('lottery_year_zodiac', currentYearZodiac) }, [currentYearZodiac]);
+            useEffect(() => { if(customers) localStorage.setItem('lottery_customers', JSON.stringify(customers)); }, [customers]);
+            useEffect(() => { if(showSettings) setTempCustomers(customers || []); }, [showSettings, customers]);
+            useEffect(() => { if (inputCustomer) { setBookTarget(inputCustomer); setBookMode('SINGLE'); } }, [inputCustomer]);
 
-            useEffect(() => { localStorage.setItem('lottery_bets_v5', JSON.stringify(bets)); }, [bets]);
-            useEffect(() => { localStorage.setItem('lottery_year_zodiac', currentYearZodiac); }, [currentYearZodiac]);
-            useEffect(() => { localStorage.setItem('lottery_customers', JSON.stringify(customers)); setTempCustomers(customers); }, [customers]);
-            useEffect(() => {
-                if (showSettings) {
-                    setTempCustomers(customers.map(c => ({ ...c, id: c.id || Math.random().toString(36).substring(2, 9), customerType: c.customerType || '客户'})));
-                }
-            }, [showSettings]);
-            
-            // v6.17: 当录入页面选择了客户，自动切换账本视图到该客户
-            useEffect(() => {
-                if (inputCustomer) {
-                    setBookTarget(inputCustomer);
-                    setBookMode('SINGLE');
-                }
-            }, [inputCustomer]);
-
-            const getNumbersForZodiac = (z) => {
-                const idx = ZODIAC_LIST.indexOf(currentYearZodiac);
-                const tIdx = ZODIAC_LIST.indexOf(z);
-                if (idx===-1 || tIdx===-1) return [];
-                const offset = (idx - tIdx + 12) % 12;
-                const nums = [];
-                for (let n = offset+1; n <= 49; n+=12) nums.push(n);
-                return nums;
-            };
-            
-            // v6.32: 智能合并行逻辑
-            // 解决用户提到的换行问题：
-            // 1. *9*10*11*1.5 换行 岁各10元 -> 应该合并
-            // 2. 09.03...40 换行 02...各5 -> 应该合并
-            const smartMergeLines = (lines) => {
-                const merged = [];
-                let pending = "";
-                
-                // Helper to check for explicit amount
-                const hasAmount = (str) => {
-                    // Matches: 各10, x10, 10元, 10米, =10, 每10, 10x
-                    // Also Chinese nums: 各十
-                    // v6.31: Add "个"
-                    return /((每个|每号|个号|个|各|买|x|X|号|=|每)[\s.．。…~＇']*[\d零一二三四五六七八九十百千]+)|(\d+[\s.．。…~＇']*[元米斤块])|(\d+[\s.．。…~＇']*x)/.test(str);
-                };
-
-                // Helper to check if line looks like betting content
-                const isBetting = (str) => {
-                    return /\d/.test(str) || /[鼠牛虎兔龙蛇马羊猴鸡狗猪红蓝绿波单双]/.test(str);
-                };
-
-                lines.forEach((line, idx) => {
-                    const cleanLine = line.trim();
-                    if (!cleanLine) return;
-
-                    // Headers break the merge chain
-                    if (REGEX_CHAT_HEADER.test(cleanLine)) {
-                        if (pending) { merged.push(pending); pending = ""; }
-                        merged.push(cleanLine);
-                        return;
-                    }
-
-                    if (hasAmount(cleanLine)) {
-                        if (pending) {
-                            // Merge!
-                            // If current line starts with unit 岁/尾/头, no space? 
-                            // Example: "...1.5" + "岁..." -> "1.5岁"
-                            const startsWithSuffix = /^[岁尾头]/.test(cleanLine);
-                            const sep = startsWithSuffix ? "" : " ";
-                            merged.push(pending + sep + cleanLine);
-                            pending = "";
-                        } else {
-                            merged.push(cleanLine);
-                        }
-                    } else {
-                        // No amount
-                        if (isBetting(cleanLine)) {
-                            // Add to pending
-                            if (pending) {
-                                // Connecting two pending lines? 
-                                // e.g. 1,2,3 (no amt) + 4,5,6 (no amt) -> Join with space
-                                const startsWithSuffix = /^[岁尾头]/.test(cleanLine);
-                                const sep = startsWithSuffix ? "" : " ";
-                                pending += sep + cleanLine;
-                            } else {
-                                pending = cleanLine;
-                            }
-                        } else {
-                            // Not betting content, flush pending
-                            if (pending) { merged.push(pending); pending = ""; }
-                            merged.push(cleanLine);
-                        }
-                    }
-                });
-                
-                if (pending) merged.push(pending);
-                return merged;
-            };
-
-            // 解析函数 1
             const parseContentWithoutAmount = useCallback((text, defaultType) => {
-                let nums = []; // v6.29: Allow duplicates (Array instead of Set)
-                let count = 0;
-                let type = defaultType;
-                let txt = text.toUpperCase();
+                let nums=[], count=0, type=defaultType, txt=text.toUpperCase();
+                if (new RegExp(PATTERN_HK).test(text)) type='HK'; else if (new RegExp(PATTERN_MO).test(text)) type='MO';
+                txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/(\d+)\s*[.,，;；*]+\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
+                txt = txt.replace(/(\d+)[.．。…~＇' -]*\s*到\s*[.．。…~＇' -]*(\d+)/g, (m,s,e) => { const n1=parseInt(s),n2=parseInt(e); return (n1<n2&&n2-n1<49) ? Array.from({length:n2-n1+1},(_,i)=>n1+i).join(' ') : m; });
+                txt = txt.replace(new RegExp(`((?:\\d+[\\s.,，;；*\\/。．…~＇' -]+)+\\d+)[\\s.,，;；*\\/。．…~＇' -]*\\s*(岁|尾|头)`, 'g'), (m,n,s)=>n.split(/[^\d]+/).filter(x=>x).map(x=>x+s).join(' '));
+                txt = txt.replace(new RegExp(`([${ZODIAC_LIST.join('')}])`,'g'), ' $1 ').replace(/[.,，;；\/\-*\—–−+。：:…~＇']/g, ' ').replace(/[*]/g, ' ');
                 
-                // v6.38: 优先判断彩种，并立即清洗掉彩种关键词，防止 "噢T" 中的 T 被后续的 T->空格 规则误杀
-                if (new RegExp(PATTERN_HK).test(text)) type = 'HK';
-                else if (new RegExp(PATTERN_MO).test(text)) type = 'MO';
-
-                // 立即移除彩种词
-                txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ')
-                         .replace(new RegExp(PATTERN_MO,'g'),' ')
-                         .replace(new RegExp(PATTERN_DUAL_STR,'g'),' ');
-
-                // v6.30: 同义词替换 (免->兔, 个/个号->各)
-                txt = txt.replace(/免/g, '兔');
-                txt = txt.replace(/(个号|个)/g, ' 各 ');
-
-                // v6.16: 检测 "十" 字作为连接符的疑似情况
-                const suspiciousTenRegex = /([尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])\s*十|十\s*(\d+[尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])/;
-                const hasSuspiciousTen = suspiciousTenRegex.test(txt);
-
-                txt = txt.replace(/[Tt]/g, ' ');
-                txt = txt.replace(/(每个|每|一共|总计)/g, ' 各 '); 
-                txt = txt.replace(/岁数/g, '岁'); 
-                txt = txt.replace(/(\d+)\s*[.,，;；*]+\s*(岁|尾|头)/g, '$1$2');
-                txt = txt.replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g, '$1 $4');
-                txt = txt.replace(/([岁尾头])(\d)/g, '$1 $2'); 
-                
-                // v6.15 修复: 范围解析
-                txt = txt.replace(/(\d+)[.．。]*\s*到\s*[.．。]*(\d+)/g, (match, start, end) => {
-                    const s = parseInt(start);
-                    const e = parseInt(end);
-                    if (s < e && e - s < 49) {
-                        let range = [];
-                        for (let i = s; i <= e; i++) range.push(i);
-                        return range.join(' ');
-                    }
-                    return match;
-                });
-
-                const multiSuffixRegex = /((\d+[\s.,，;；*\/]+)+\d+)\s*[.,，;；*\/]*\s*(岁|尾|头)/g;
-                txt = txt.replace(multiSuffixRegex, (m, p, _, s) => p.split(/[.,，;；*\/]+/).filter((n)=>n.trim()).map((n)=>n.trim()+s).join(' '));
-                txt = txt.replace(new RegExp(`([${ZODIAC_LIST.join('')}])`,'g'), ' $1 ');
-                
-                // v6.19 & v6.30: 强力清洗 (包含 ＇ ' ~)
-                let clean = txt.replace(/[.,，;；\/\-*\—–−+。：:…~＇']/g, ' ').replace(/[*]/g, ' ');
-                
-                // 分词
-                const tokens = clean.split(/\s+/).map(t => t.replace(REGEX_AMOUNT_WITH_SLASH, '').trim()).filter(t => t && !t.includes('(XXF)') && !t.match(/^\d{11}$/));
-                
-                let hasUnknown = false; // Move definition of hasUnknown here to fix ReferenceError
-
-                tokens.forEach(t => {
-                    // v6.13: 尝试强力提取数字
+                const hasSuspiciousTen = /([尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])\s*十|十\s*(\d+[尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])/.test(txt);
+                let hasUnknown = false;
+                txt.split(/\s+/).map(t=>t.replace(REGEX_AMOUNT_WITH_SLASH,'').trim()).filter(t=>t&&!t.includes('(XXF)')&&!t.match(/^\d{11}$/)).forEach(t => {
+                    const heMatch = t.match(/^合(?:数)?(\d+)$/); if(heMatch) { const v=parseInt(heMatch[1]); if(!isNaN(v)) for(let i=1;i<=49;i++) if(Math.floor(i/10)+(i%10)===v){nums.push(i);count++} return; }
                     let n = parseInt(t);
-                    let extracted = false;
-                    
-                    if (isNaN(n)) {
-                        // 尝试提取纯数字
-                        const match = t.match(/^(\d+)/); 
-                        if (match) {
-                            n = parseInt(match[1]);
-                            extracted = true; 
-                            hasUnknown = true; 
-                        } else {
-                            // 彻底无法识别，且不是关键词
-                            if (!KEYWORDS[t] && !ZODIAC_LIST.includes(t) && !t.endsWith('岁') && !t.endsWith('尾') && !t.endsWith('头')) {
-                                hasUnknown = true;
-                            }
-                        }
-                    }
-
-                    if (!isNaN(n) && n>=1 && n<=49 && !t.endsWith('岁') && !t.endsWith('尾') && !t.endsWith('头')) { 
-                        nums.push(n); count++; // v6.29: Array push
-                        return; 
-                    }
+                    if (isNaN(n)) { const m = t.match(/^(\d+)/); if(m){ n=parseInt(m[1]); hasUnknown=true; } else if(!KEYWORDS[t]&&!ZODIAC_LIST.includes(t)&&!/^[岁尾头]$/.test(t.slice(-1))) hasUnknown=true; }
+                    if (!isNaN(n) && n>=1 && n<=49 && !/^[岁尾头]$/.test(t.slice(-1))) { nums.push(n); count++; return; }
                     if (KEYWORDS[t]) { KEYWORDS[t].forEach(x=>nums.push(x)); count+=KEYWORDS[t].length; return; }
-                    if (ZODIAC_LIST.includes(t)) { getNumbersForZodiac(t).forEach(x=>nums.push(x)); count+=getNumbersForZodiac(t).length; return; }
-                    if (t.endsWith('岁')) { const age = parseInt(t.replace('岁','')); if (!isNaN(age)) { let temp=age; while(temp<=49){if(temp>0){nums.push(temp);count++;} temp+=12;} } return; }
-                    if (t.endsWith('尾') || t.endsWith('头')) {
-                        const val = parseInt(t.slice(0,-1));
-                        if(!isNaN(val)) {
-                            const isTail = t.endsWith('尾');
-                            for(let i=0; i<=49; i++) { if(i===0) continue; if((isTail && i%10===val) || (!isTail && Math.floor(i/10)===val)) { nums.push(i); count++; } }
-                        }
-                    }
+                    if (ZODIAC_LIST.includes(t)) { getNumbersForZodiac(t, currentYearZodiac).forEach(x=>nums.push(x)); count+=getNumbersForZodiac(t, currentYearZodiac).length; return; }
+                    if (t.endsWith('岁')) { const a=parseInt(t); if(!isNaN(a)) for(let x=a;x<=49;x+=12) if(x>0){nums.push(x);count++} return; }
+                    if (t.endsWith('尾')||t.endsWith('头')) { const v=parseInt(t); if(!isNaN(v)) { const isT=t.endsWith('尾'); for(let i=(isT?1:0);i<=49;i++) if(i>0 && (isT?i%10===v:Math.floor(i/10)===v)){nums.push(i);count++} } return; }
+                    if (!isNaN(n) && (n<1 || n>49)) hasUnknown=true;
                 });
-                return { numbers: nums.sort((a,b)=>a-b), totalBetCount: count, type, hasUnknown: hasUnknown || hasSuspiciousTen };
+                return { numbers: nums.sort((a,b)=>a-b), totalBetCount: count, type, hasUnknown: hasUnknown||hasSuspiciousTen };
             }, [currentYearZodiac]);
 
             const parseContentForSegments = useCallback((text, defaultAmtStr) => {
-                let clientTotal = '';
-                const contentWithoutTotal = text.replace(REGEX_CLIENT_TOTAL, (match) => { clientTotal = match; return ''; }).trim();
-                if (!contentWithoutTotal) return [];
-                const defAmt = parseFloat(defaultAmtStr) || 0;
-                const segments = [];
-                // v6.32: 使用 smartMergeLines 预处理行
-                const rawLines = contentWithoutTotal.split(/[\n]/).filter(l => l.trim());
-                const lines = smartMergeLines(rawLines);
-                
-                // v6.26 Fix: Global context detection (后置签名识别)
-                // 如果全文包含“香港/香”且不含“澳门/澳”，则默认全单为香港
-                let currType = 'MO';
-                const hasHK = new RegExp(PATTERN_HK).test(contentWithoutTotal);
-                const hasMO = new RegExp(PATTERN_MO).test(contentWithoutTotal);
-                if (hasHK && !hasMO) {
-                    currType = 'HK';
-                }
+                let clientTotal = ''; const content = text.replace(REGEX_CLIENT_TOTAL, m => { clientTotal=m; return ''; }).trim();
+                if (!content) return [];
+                const segments=[], lines = smartMergeLines(content.split(/[\n]/).filter(l=>l.trim()));
+                let currType = (new RegExp(PATTERN_HK).test(content) && !new RegExp(PATTERN_MO).test(content)) ? 'HK' : 'MO';
 
                 lines.forEach(line => {
                     if (REGEX_CHAT_HEADER.test(line)) return;
-                    const isOnlyType = (new RegExp(`^(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?$`).test(line.trim()));
+                    if (new RegExp(`^(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?$`).test(line.trim())) return;
+                    if (new RegExp(PATTERN_HK).test(line)) currType='HK'; else if (new RegExp(PATTERN_MO).test(line)) currType='MO'; else if (/奥|门/.test(line)) currType='MO';
                     
-                    // 行内类型覆盖全局默认值
-                    if (new RegExp(PATTERN_HK).test(line)) currType = 'HK';
-                    else if (new RegExp(PATTERN_MO).test(line)) currType = 'MO';
-                    else if (/奥|门/.test(line)) currType = 'MO';
+                    // v6.67 Update: 智能拆分，强制将混合行（如：各40，18/100）拆分为多行
+                    // 先处理显式金额+分隔符的情况
+                    let processedLine = line.replace(/((?:每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)\s*[\d零一二三四五六七八九十百千]+(?:[\.]\d+)?[元米斤块]?)\s*[，,;；]\s*/g, '$1\n');
+                    // 再处理斜杠金额+分隔符的情况
+                    processedLine = processedLine.replace(/(\d+\s*[/]\s*\d+)\s*[，,;；]\s*/g, '$1\n');
 
-                    const isDual = REGEX_DUAL.test(line);
-                    const hasExplicitKeyword = /(各|买|=|每|号)/.test(line); // "号" is explicit now
-                    const regex = hasExplicitKeyword ? REGEX_AMOUNT_NO_SLASH : REGEX_AMOUNT_WITH_SLASH;
+                    // 按换行符或 '另外' 拆分
+                    let splitParts = processedLine.split(processedLine.includes('\n')?'\n':(processedLine.includes('另外')?'另外':/a^/));
                     
-                    // v6.11: 处理逗号分隔的混合模式
-                    let preprocessedLine = line;
-                    preprocessedLine = preprocessedLine.replace(/(\d+\s*[/]\s*\d+)\s*[，,;；]\s*/g, '$1\n');
-
-                    let splitParts = [preprocessedLine];
-                    if (preprocessedLine.includes('\n')) {
-                         splitParts = preprocessedLine.split('\n');
-                    } else if (preprocessedLine.includes('另外')) {
-                        splitParts = preprocessedLine.split('另外');
-                    }
-
                     splitParts.forEach(subLine => {
                         if(!subLine.trim()) return;
-                         const matches = Array.from(subLine.matchAll(regex));
-
+                        
+                        // v6.67 Update: 对每个子行独立选择正则，不再受整行影响
+                        // 如果子行包含“各”等显式关键字，用 NO_SLASH；否则用 WITH_SLASH (支持 18/100)
+                        const regex = /(各|买|=|每|号)/.test(subLine) ? REGEX_AMOUNT_NO_SLASH : REGEX_AMOUNT_WITH_SLASH;
+                        
+                        const matches = Array.from(subLine.matchAll(regex));
                         if (matches.length === 0) {
                             const res = parseContentWithoutAmount(subLine, currType);
-                            if (isOnlyType) return;
-
-                            if (res.totalBetCount === 0) return; 
-
-                            const hasUnit = /[元米斤块]/.test(subLine);
-                            // v6.13: 如果有未知字符，标记为 suspicious
-                            // v6.31 Fix: 允许 "个" 字作为非 suspicious 字符
-                            let isSus = (res.totalBetCount > 1 && defAmt === 0 && !hasUnit) || res.hasUnknown;
-                            if (res.totalBetCount > 0 || subLine.trim().length > 0) {
-                                segments.push({
-                                    numbers: res.numbers, totalBetCount: res.totalBetCount, amount: defAmt,
-                                    content: subLine, type: res.type, isDualBet: isDual, isValid: res.totalBetCount > 0 && defAmt > 0, 
-                                    rawLine: subLine, isSuspicious: isSus,
-                                    fullLine: line 
-                                });
-                            }
-                            return;
-                        }
-                        
-                        let cursor = 0;
-                        matches.forEach(m => {
-                            const amtTxt = m[0];
-                            const idx = m.index;
-                            let content = subLine.substring(cursor, idx).trim();
-                            // v6.19 & v6.30: 清洗时允许点和省略号、波浪号、单引号在前后存在
-                            content = content.replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
-                            let amt = 0;
-                            const numM = amtTxt.match(/(\d+(\.\d+)?)/);
-                            if (numM) amt = parseFloat(numM[0]);
-                            else {
-                                const chM = amtTxt.match(new RegExp(`[${CH_NUM}]+`));
-                                if (chM) { const v = parseChineseNumber(chM[0]); if (!isNaN(v)) amt = v; }
-                            }
-                            if (content.length > 0) {
-                                const res = parseContentWithoutAmount(content, currType);
-                                // v6.31 Fix: 允许 "个" 字作为非 suspicious 字符
-                                let isSus = false;
-                                if (res.totalBetCount > 1) { 
-                                    if (!/[各xX\/元米斤块=每号个]/.test(amtTxt)) isSus = true; 
+                            // v6.68 Fix: 变量名修正 REGEX_DUAL
+                            const isDual = REGEX_DUAL.test(subLine);
+                            if (res.totalBetCount > 0 || res.hasUnknown || subLine.trim()) segments.push({ numbers:res.numbers, totalBetCount:res.totalBetCount, amount:parseFloat(defaultAmtStr)||0, content:subLine, type:res.type, isDualBet:isDual, isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), rawLine:subLine, isSuspicious:(res.totalBetCount>1&&!parseFloat(defaultAmtStr)&&!/[元米斤块]/.test(subLine))||res.hasUnknown, fullLine:line });
+                        } else {
+                            let cursor=0;
+                            matches.forEach(m => {
+                                const amtTxt=m[0], idx=m.index, content=subLine.substring(cursor, idx).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
+                                let amt=0, numM=amtTxt.match(/(\d+(\.\d+)?)/); if(numM) amt=parseFloat(numM[0]); else { const chM=amtTxt.match(new RegExp(`[${CH_NUM}]+`)); if(chM) amt=parseChineseNumber(chM[0]); }
+                                if(content){ 
+                                    const res=parseContentWithoutAmount(content, currType); 
+                                    // v6.68 Fix: 恢复 isDual 变量定义 (inside subLine scope logic)
+                                    const isDual = REGEX_DUAL.test(content);
+                                    if(res.totalBetCount>0 || res.hasUnknown) segments.push({ numbers:res.numbers, totalBetCount:res.totalBetCount, amount:amt, content, type:res.type, isDualBet:isDual, isValid:amt>0 && res.totalBetCount>0, rawLine:content+amtTxt, isSuspicious:(res.totalBetCount>1&&!/[各xX\/元米斤块=每号个]/.test(amtTxt))||res.hasUnknown, fullLine:line }); 
                                 }
-                                if (res.hasUnknown) isSus = true;
-                                
-                                if (res.totalBetCount > 0) {
-                                    segments.push({
-                                        numbers: res.numbers, totalBetCount: res.totalBetCount, amount: amt,
-                                        content: content, type: res.type, isDualBet: isDual || REGEX_DUAL.test(content),
-                                        isValid: amt > 0, rawLine: content + amtTxt, isSuspicious: isSus,
-                                        fullLine: line 
-                                    });
-                                }
-                            }
-                            cursor = idx + amtTxt.length;
-                        });
-                        // v6.19 & v6.30: 清洗时允许点和省略号、波浪号、单引号在前后存在
-                        let trail = subLine.substring(cursor).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
-                        if (trail.length > 0) {
-                            const res = parseContentWithoutAmount(trail, currType);
-                            if (res.totalBetCount > 0) { 
-                                segments.push({ 
-                                    numbers: res.numbers, totalBetCount: res.totalBetCount, amount: defAmt, 
-                                    content: trail, type: res.type, isDualBet: isDual || REGEX_DUAL.test(trail), 
-                                    isValid: res.totalBetCount > 0 && defAmt > 0, rawLine: trail, 
-                                    isSuspicious: defAmt === 0 || res.hasUnknown, // v6.13
-                                    fullLine: line
-                                }); 
+                                cursor=idx+amtTxt.length;
+                            });
+                            const trail = subLine.substring(cursor).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
+                            if(trail){ 
+                                const res=parseContentWithoutAmount(trail, currType); 
+                                const isDual = REGEX_DUAL.test(trail);
+                                if(res.totalBetCount>0 || res.hasUnknown) segments.push({ numbers:res.numbers, totalBetCount:res.totalBetCount, amount:parseFloat(defaultAmtStr)||0, content:trail, type:res.type, isDualBet:isDual, isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), rawLine:trail, isSuspicious:!parseFloat(defaultAmtStr)||res.hasUnknown, fullLine:line }); 
                             }
                         }
                     });
                 });
-                
-                if (segments.length > 0) {
-                    if (clientTotal) segments[0].clientTotal = clientTotal;
-                    // 如果有 contentWithoutTotal，确保第一条记录携带它，用于显示完整原始记录
-                    if (contentWithoutTotal) segments[0].fullText = contentWithoutTotal;
-                }
-                
+                if(segments.length>0) { if(clientTotal) segments[0].clientTotal=clientTotal; if(content) segments[0].fullText=content; }
                 return segments;
-            }, [parseContentWithoutAmount, currentYearZodiac]);
+            }, [parseContentWithoutAmount]);
 
             useEffect(() => {
                 const txt = inputContent.trim();
                 if (!txt) { setPreviewBatches([]); return; }
-                const blocks = [];
-                let curHead = '', curLines = [];
-                txt.split('\n').forEach(l => {
-                    const isH = /[:：]\s*$/.test(l) && !new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})[:：]`).test(l);
-                    if (isH) { if(curLines.length) blocks.push({header: curHead, text: curLines.join('\n')}); curHead=l.trim(); curLines=[]; }
-                    else if (l.trim()) curLines.push(l);
-                });
-                if (curLines.length) {
-                    if (!curHead && blocks.length === 0) blocks.push({header: '', text: curLines.join('\n')});
-                    else blocks.push({header: curHead, text: curLines.join('\n')});
-                }
-                const previews = blocks.map(b => ({
-                    header: b.header,
-                    segments: parseContentForSegments(b.text, defaultAmount).filter(s => s.totalBetCount > 0), 
-                })).filter(p => p.segments.length > 0);
+                const blocks=[]; let curHead='', curLines=[];
+                txt.split('\n').forEach(l => { const isH=/[:：]\s*$/.test(l)&&!new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})[:：]`).test(l); if(isH){if(curLines.length)blocks.push({header:curHead,text:curLines.join('\n')});curHead=l.trim();curLines=[];} else if(l.trim())curLines.push(l); });
+                if(curLines.length) blocks.push({header:curHead,text:curLines.join('\n')});
+                
+                // v6.66 Update: 智能核对逻辑
+                const previews = blocks.map(b => {
+                    const segments = parseContentForSegments(b.text, defaultAmount).filter(s=>s.totalBetCount>0 || s.isSuspicious);
+                    
+                    // 计算系统总额
+                    const systemTotal = segments.reduce((acc, seg) => {
+                         const segAmt = (seg.isValid && !seg.isSuspicious) ? seg.amount : 0;
+                         const multiplier = seg.isDualBet ? 2 : 1; 
+                         return acc + (seg.totalBetCount * segAmt * multiplier);
+                    }, 0);
+
+                    // 提取客户手写总额
+                    let clientTotalVal = null;
+                    const clientTotalStr = segments[0]?.clientTotal;
+                    if (clientTotalStr) {
+                        const m = clientTotalStr.match(/(\d+(\.\d+)?)/);
+                        if (m) clientTotalVal = parseFloat(m[0]);
+                    }
+
+                    // 判定是否不符 (容差 0.5)
+                    const mismatch = clientTotalVal !== null && Math.abs(clientTotalVal - systemTotal) > 0.5;
+
+                    return { 
+                        header: b.header, 
+                        segments, 
+                        systemTotal, 
+                        clientTotalStr, 
+                        mismatch, 
+                        clientTotalVal 
+                    };
+                }).filter(p => p.segments.length > 0);
+                
                 setPreviewBatches(previews);
             }, [inputContent, defaultAmount, parseContentForSegments]);
 
             const handleAddBet = (e) => {
-                e.preventDefault();
-                if (!inputCustomer) { showAlert("请先选择客户", "warning"); return; }
-                
-                const targetName = inputCustomer.trim();
-                if (!customers.find(c => c.name === targetName)) { showAlert("客户不存在，请先在客户管理中添加", "error"); return; }
-                
-                const newBets = [];
-                let total = 0;
+                e.preventDefault(); if (!inputCustomer) return showAlert("请先选择客户", "warning");
+                const newBets = []; let total = 0;
                 previewBatches.forEach((batch, idx) => {
                     const batchId = (Date.now() + idx).toString(36) + Math.random().toString(36).substr(2, 5);
-                    const ts = Date.now() + idx;
-                    let cust = targetName; 
-                    
-                    batch.segments.forEach((seg) => {
-                        const types = seg.isDualBet ? ['HK', 'MO'] : [seg.type];
-                        const isErr = !seg.isValid || seg.isSuspicious;
-                        types.forEach((t) => {
-                            const amt = isErr ? 0 : seg.amount;
-                            newBets.push({
-                                id: batchId + '-' + t + Math.random().toString(36).substr(2,5),
-                                batchId, customerName: cust, type: t, numbers: seg.numbers,
-                                totalBetCount: seg.totalBetCount, amountPerNumber: seg.amount,
-                                totalAmount: seg.totalBetCount * amt, timestamp: ts,
-                                rawInput: seg.rawLine, formattedContent: seg.rawLine, originalHeader: batch.header,
-                                isError: isErr, originalTotal: seg.clientTotal || '',
-                                fullText: seg.fullText || ''
-                            });
+                    batch.segments.forEach(seg => {
+                        (seg.isDualBet ? ['HK', 'MO'] : [seg.type]).forEach(t => {
+                            const amt = (seg.isValid && !seg.isSuspicious) ? seg.amount : 0;
+                            newBets.push({ id:batchId+'-'+t+Math.random().toString(36), batchId, customerName:inputCustomer, type:t, numbers:seg.numbers, totalBetCount:seg.totalBetCount, amountPerNumber:seg.amount, totalAmount:seg.totalBetCount*amt, timestamp:Date.now()+idx, rawInput:seg.rawLine, formattedContent:seg.rawLine, originalHeader:batch.header, isError:!seg.isValid||seg.isSuspicious, originalTotal:seg.clientTotal||'', fullText:seg.fullText||'' });
                             total += seg.totalBetCount * amt;
                         });
                     });
                 });
-                setBets(prev => [...prev, ...newBets]);
-                let msg = `成功提交！共 ¥${total}`;
-                showAlert(msg, 'success');
-                setInputContent(''); setActiveTab('customers');
+                setBets(p => [...p, ...newBets]); showAlert(`成功提交！共 ¥${total}`, 'success'); setInputContent(''); setActiveTab('customers');
             };
 
-            // --- 清空功能 ---
-            const handleClearClick = () => {
-                const target = inputCustomer.trim();
-                setActionSheet({
-                    title: "数据管理",
-                    actions: [
-                        { 
-                            text: target ? `🗑️ 清空 [${target}]` : "请先选择客户", 
-                            className: target ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-200" : "bg-gray-100 text-gray-400 cursor-not-allowed", 
-                            onClick: () => {
-                                if (!target) return;
-                                setActionSheet(null); 
-                                setTimeout(() => {
-                                    // 直接执行逻辑，不依赖原生 confirm
-                                    setBets(prev => prev.filter(b => b.customerName !== target));
-                                    showAlert(`已清空 ${target} 的记录`, 'success');
-                                }, 50);
-                            }
-                        },
-                        { 
-                            text: "⚠️ 清空所有数据", 
-                            className: "bg-red-100 text-red-700 hover:bg-red-200", 
-                            onClick: () => {
-                                setActionSheet(null);
-                                setTimeout(() => {
-                                    setBets([]); 
-                                    localStorage.removeItem('lottery_bets_v5'); 
-                                    showAlert('系统已重置', 'success');
-                                }, 50);
-                            }
-                        }
-                    ],
-                    onCancel: () => setActionSheet(null)
-                });
-            };
-            
-            // 客户选择回调
-            const handleSelectCustomer = (name) => {
-                setInputCustomer(name);
-                setShowCustomerModal(false);
-                showAlert(`已切换到客户: ${name}`, 'success');
-            };
-
-            const handleDeleteBatch = (bid) => { if(confirm('确定删除?')) setBets(bets.filter(b=>b.batchId!==bid)); };
-            // v6.33: 修复删除按钮无反应问题，使用 ConfirmationModal 代替 confirm()
-            const handleDeleteBatchWithModal = (batchId) => {
-                setConfirmation({
-                    message: "确定要删除此笔订单吗？",
-                    onConfirm: () => {
-                        setBets(prev => prev.filter(b => b.batchId !== batchId));
-                        setConfirmation(null);
-                        showAlert('已删除', 'success');
-                    },
-                    onCancel: () => setConfirmation(null)
-                });
-            };
-
-            const handleUpdateCustomerField = (id, k, v) => setTempCustomers(prev=>prev.map(c=>c.id===id?{...c,[k]:v}:c));
-            const handleAddCustomerRow = () => setTempCustomers([...tempCustomers, { id: Math.random().toString(), name: '', customerType: '客户', odds: 47.5, rebate: 0.05, aliases: [] }]);
-            const handleDeleteCustomerRow = (id, name) => { if(!name) setTempCustomers(tempCustomers.filter(c => c.id !== id)); };
-            const handleSaveCustomers = () => { setCustomers(tempCustomers); setShowSettings(false); };
-            
-            const customerStats = useMemo(() => {
-                const grouped = {}, batches = {};
-                bets.forEach(b => {
-                    if (!batches[b.batchId]) {
-                        batches[b.batchId] = { 
-                            batchId: b.batchId, customerName: b.customerName, total: 0, header: b.originalHeader, 
-                            timestamp: b.timestamp, records: [], originalTotal: b.originalTotal || '', fullText: b.fullText
-                        };
-                    }
-                    const segments = parseContentForSegments(b.rawInput || '', '0', currentYearZodiac);
-                    const isCurrentValid = segments.length > 0 && segments.every(s => s.isValid && !s.isSuspicious);
-                    if (isCurrentValid && b.isError === true) {
-                         b.isError = false; 
-                         b.totalAmount = segments.reduce((acc, seg) => acc + seg.totalBetCount * seg.amount * (seg.isDualBet ? 2 : 1), 0);
-                    }
-                    batches[b.batchId].total += b.totalAmount;
-                    batches[b.batchId].records.push(b);
-                });
-                Object.values(batches).forEach(b => {
-                    if (!grouped[b.customerName]) grouped[b.customerName] = { total: 0, batches: [] };
-                    grouped[b.customerName].total += b.total;
-                    grouped[b.customerName].batches.push(b);
-                });
-                return Object.entries(grouped).map(([name, d]) => ({
-                    name, total: d.total, batches: d.batches.sort((a,b) => a.timestamp - b.timestamp)
-                }));
-            }, [bets, parseContentForSegments]);
-
+            const handleClearClick = () => setActionSheet({ title: "数据管理", actions: [ { text: inputCustomer?`🗑️ 清空 [${inputCustomer}]`:"请先选择客户", onClick:()=>{ if(inputCustomer){ setBets(p=>p.filter(b=>b.customerName!==inputCustomer)); showAlert(`已清空 ${inputCustomer}`, 'success'); setActionSheet(null); } } }, { text: "⚠️ 清空所有数据", className: "bg-red-100 text-red-700", onClick:()=>{ setBets([]); showAlert('系统已重置', 'success'); setActionSheet(null); } } ], onCancel:()=>setActionSheet(null) });
+            const handleDeleteBatchWithModal = (batchId) => setConfirmation({ message: "确定要删除此笔订单吗？", onConfirm: () => { setBets(p => p.filter(b => b.batchId !== batchId)); setConfirmation(null); showAlert('已删除', 'success'); }, onCancel: () => setConfirmation(null) });
             const handleSaveEditedBatch = (batchId, lines) => {
-                const batchIndices = bets.map((b, i) => b.batchId === batchId ? i : -1).filter(i => i !== -1);
-                if(batchIndices.length === 0) return;
-                const firstIndex = batchIndices[0];
-                const oldBatch = bets[firstIndex];
-                const newRecs = [];
-                const segments = parseContentForSegments(lines.join('\n'), '0');
-                let clientTotal = segments[0]?.clientTotal || '';
-                let fullText = oldBatch.fullText; 
-                segments.forEach(s => {
-                    const types = s.isDualBet ? ['HK', 'MO'] : [s.type];
-                    types.forEach(t => {
-                        const isErr = !s.isValid || s.isSuspicious;
-                        newRecs.push({
-                            id: batchId + Math.random(), batchId, customerName: oldBatch.customerName, type: t, numbers: s.numbers,
-                            totalBetCount: s.totalBetCount, amountPerNumber: s.amount, totalAmount: s.totalBetCount * (isErr ? 0 : s.amount),
-                            timestamp: oldBatch.timestamp, rawInput: s.rawLine, formattedContent: s.rawLine, originalHeader: oldBatch.originalHeader, isError: isErr,
-                            originalTotal: clientTotal, fullText 
-                        })
-                    })
-                });
-                const betsBefore = bets.slice(0, firstIndex);
-                const betsAfter = bets.slice(firstIndex).filter(b => b.batchId !== batchId);
-                setBets([...betsBefore, ...newRecs, ...betsAfter]);
-                setBatchToEdit(null);
-                showAlert('修改保存成功');
+                const oldBatch = bets.find(b=>b.batchId===batchId); if(!oldBatch) return;
+                const newRecs = []; const segments = parseContentForSegments(lines.join('\n'), '0');
+                segments.forEach(s => (s.isDualBet?['HK','MO']:[s.type]).forEach(t => newRecs.push({ id:batchId+Math.random(), batchId, customerName:oldBatch.customerName, type:t, numbers:s.numbers, totalBetCount:s.totalBetCount, amountPerNumber:s.amount, totalAmount:s.totalBetCount*(s.isValid&&!s.isSuspicious?s.amount:0), timestamp:oldBatch.timestamp, rawInput:s.rawLine, formattedContent:s.rawLine, originalHeader:oldBatch.originalHeader, isError:!s.isValid||s.isSuspicious, originalTotal:segments[0]?.clientTotal||'', fullText:oldBatch.fullText })));
+                setBets(prev => [...prev.filter(b=>b.batchId!==batchId), ...newRecs]); setBatchToEdit(null); showAlert('修改保存成功');
             };
 
             const riskStats = useMemo(() => {
-                const hk = Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0}));
-                const mo = Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0}));
-                let [tpH, trH, tpM, trM] = [0,0,0,0];
-                bets.forEach(b => {
-                    if (b.isError) return;
-                    const cust = customers.find(c => c.name === b.customerName) || {odds:47.5, rebate:0.1};
-                    const rebate = b.totalAmount * cust.rebate;
-                    if (b.type==='HK') { tpH+=b.totalAmount; trH+=rebate; } else { tpM+=b.totalAmount; trM+=rebate; }
-                    b.numbers.forEach(n => {
-                        if (n>=1 && n<=49) {
-                            const t = b.type==='HK'?hk[n-1]:mo[n-1];
-                            t.betAmt += b.amountPerNumber;
-                            t.payout += b.amountPerNumber * cust.odds;
-                        }
-                    });
+                const hk=Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0})), mo=Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0}));
+                let [tpH,trH,tpM,trM]=[0,0,0,0];
+                bets.filter(b=>!b.isError).forEach(b => {
+                    const c = customers.find(x=>x.name===b.customerName)||{odds:47.5,rebate:0.1}, reb = b.totalAmount*c.rebate;
+                    if(b.type==='HK'){tpH+=b.totalAmount;trH+=reb}else{tpM+=b.totalAmount;trM+=reb}
+                    b.numbers.filter(n=>n>=1&&n<=49).forEach(n=>{const t=b.type==='HK'?hk[n-1]:mo[n-1]; t.betAmt+=b.amountPerNumber; t.payout+=b.amountPerNumber*c.odds;});
                 });
-                const calc = (l, pool, reb) => l.map(i => ({...i, customerPL: (i.payout+reb)-pool})).sort((a,b)=>b.betAmt-a.betAmt);
-                return { hk: calc(hk,tpH,trH), mo: calc(mo,tpM,trM), hkPool:tpH, hkRebate:trH, moPool:tpM, moRebate:trM };
+                const calc=(l,pool,reb)=>l.map(i=>({...i,customerPL:(i.payout+reb)-pool})).sort((a,b)=>b.betAmt-a.betAmt);
+                return { hk:calc(hk,tpH,trH), mo:calc(mo,tpM,trM), hkPool:tpH, moPool:tpM };
             }, [bets, customers]);
+
+            const customerStats = useMemo(() => {
+                const grouped = {};
+                bets.forEach(b => {
+                    if (!grouped[b.customerName]) grouped[b.customerName] = { total: 0, batches: {} };
+                    if (!grouped[b.customerName].batches[b.batchId]) grouped[b.customerName].batches[b.batchId] = { batchId: b.batchId, total: 0, records: [], timestamp: b.timestamp };
+                    grouped[b.customerName].total += b.totalAmount;
+                    grouped[b.customerName].batches[b.batchId].total += b.totalAmount;
+                    grouped[b.customerName].batches[b.batchId].records.push(b);
+                });
+                return Object.entries(grouped).map(([name, d]) => ({ name, total: d.total, batches: Object.values(d.batches).sort((a,b) => a.timestamp - b.timestamp) }));
+            }, [bets]);
+            const displayedCustomerStats = useMemo(() => bookMode==='ALL' ? customerStats : customerStats.filter(c=>c.name===bookTarget), [customerStats, bookMode, bookTarget]);
 
             const reconciliationStats = useMemo(() => {
                 const [wh, wm] = [parseInt(winningNumberHK), parseInt(winningNumberMO)];
@@ -1064,23 +555,8 @@
                         tBatch[b.batchId].total += b.totalAmount;
                         tBatch[b.batchId].lines.add(b.rawInput||'');
                         total += b.totalAmount;
-                        // v6.29: Correct win calculation for duplicates
-                        if (b.type==='HK' && !isNaN(wh)) { 
-                            const winCount = b.numbers.filter(n => n === wh).length;
-                            if (winCount > 0) {
-                                const winAmt = winCount * b.amountPerNumber;
-                                tBatch[b.batchId].winHK += winAmt; 
-                                winHK += winAmt; 
-                            }
-                        }
-                        if (b.type==='MO' && !isNaN(wm)) { 
-                            const winCount = b.numbers.filter(n => n === wm).length;
-                            if (winCount > 0) {
-                                const winAmt = winCount * b.amountPerNumber;
-                                tBatch[b.batchId].winMO += winAmt; 
-                                winMO += winAmt; 
-                            }
-                        }
+                        if (b.type==='HK' && !isNaN(wh)) b.numbers.forEach(n => { if (n === wh) { const winAmt = b.amountPerNumber; tBatch[b.batchId].winHK += winAmt; winHK += winAmt; } });
+                        if (b.type==='MO' && !isNaN(wm)) b.numbers.forEach(n => { if (n === wm) { const winAmt = b.amountPerNumber; tBatch[b.batchId].winMO += winAmt; winMO += winAmt; } });
                     });
                     const details = [];
                     let idx = 1;
@@ -1110,9 +586,9 @@
                     const w = b.winHK+b.winMO;
                     let lbl = '';
                     if(w>0) {
-                        if(b.winHK>0 && b.winMO>0) lbl=` [中: ¥${w} (港${b.winHK}+门${b.winMO})]`; // v6.24: Use "门" instead of "澳" for contrast
+                        if(b.winHK>0 && b.winMO>0) lbl=` [中: ¥${w} (港${b.winHK}+门${b.winMO})]`;
                         else if(b.winHK>0) lbl=` [中: ¥${w} (港)]`;
-                        else lbl=` [中: ¥${w}]`; // v6.24: No label for pure Macau win
+                        else lbl=` [中: ¥${w}]`;
                     }
                     return `(${b.idx})合计: ${b.total}${lbl}`;
                 }).join('\n');
@@ -1124,236 +600,136 @@
                 setTextPreview({ title: `${stat.name} 对账详单`, content: txt });
             }
 
-            // v6.17 账本渲染辅助
-            const displayedCustomerStats = useMemo(() => {
-                if (bookMode === 'ALL') return customerStats;
-                return customerStats.filter(c => c.name === bookTarget);
-            }, [customerStats, bookMode, bookTarget]);
-
-            const currentBookTotal = useMemo(() => {
-                return displayedCustomerStats.reduce((acc, curr) => acc + curr.total, 0);
-            }, [displayedCustomerStats]);
-
             return (
-                <div className="max-w-md mx-auto min-h-screen pb-24">
-                    {/* 顶部 Header */}
-                    <div className="bg-indigo-600 text-white p-4 sticky top-0 z-50 shadow-lg flex justify-between items-center">
-                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5"/> 彩票系统 v6.37</div>
-                        <button onClick={()=>setShowSettings(true)} className="bg-indigo-500 px-3 py-1 rounded text-sm font-bold hover:bg-indigo-400">客户管理</button>
+                <div className="max-w-md mx-auto min-h-screen bg-gray-50 flex flex-col">
+                    {/* Header: 固定顶部，层级最高 */}
+                    <div id="app-header" className="bg-indigo-600 text-white p-4 shadow-lg flex justify-between items-center">
+                        <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5 text-yellow-300"/> 订单管理系统 v6.68</div>
+                        <button onClick={()=>setShowSettings(true)} className="bg-white/20 px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-white/30 btn-press backdrop-blur-sm transition-all border border-white/10">客户管理</button>
                     </div>
-                    {message && (<div className={`fixed top-16 left-4 right-4 p-3 rounded-lg shadow-xl text-white z-[60] text-center ${message.type==='error'?'bg-red-500':'bg-green-500'} animate-bounce`}>{message.text}</div>)}
                     
-                    <div className="p-4">
+                    {message && <div className={`fixed top-20 left-4 right-4 p-3 rounded-lg shadow-xl text-white z-[9999] text-center ${message.type==='error'?'bg-red-500':'bg-green-500'} animate-fade-in`}>{message.text}</div>}
+                    
+                    <div id="app-content" className="flex-1 p-4">
                         {activeTab === 'input' && (
-                            <div className="space-y-4">
-                                <div className="bg-white p-4 rounded-xl shadow border border-indigo-100">
-                                    <h3 className="font-bold text-indigo-800 mb-2 flex items-center gap-2">快速录入</h3>
-                                    
-                                    {/* 客户选择区域 */}
-                                    <div className="flex gap-2 mb-2">
-                                        <div 
-                                            className="flex-1 border p-3 rounded-lg bg-slate-50 text-slate-700 font-bold flex items-center justify-between cursor-pointer hover:bg-slate-100 active:bg-slate-200 transition-colors shadow-sm" 
-                                            onClick={() => setShowCustomerModal(true)}
-                                        >
-                                            {inputCustomer ? (
-                                                <span className="text-lg text-indigo-700">{inputCustomer}</span>
-                                            ) : (
-                                                <span className="text-gray-400 font-normal">请选择客户...</span>
-                                            )}
-                                            <Icon name="ChevronDown" className="w-5 h-5 text-slate-400"/>
+                            <div className="flex flex-col h-full gap-4">
+                                {/* 录入页顶部状态栏：独立层级 */}
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-1 flex items-center justify-between sticky top-[72px] z-30">
+                                    <div className="flex-1 px-3 py-2">
+                                        <div className="text-xs text-slate-400 font-bold mb-0.5">当前客户</div>
+                                        <div className={`text-lg font-bold truncate ${inputCustomer ? 'text-indigo-600' : 'text-slate-300'}`}>
+                                            {inputCustomer || "未选择"}
                                         </div>
-                                        <button onClick={() => setShowCustomerModal(true)} className="bg-indigo-500 text-white px-4 rounded-lg font-bold text-sm whitespace-nowrap shadow-md active:scale-95 transition-transform flex items-center gap-1">
-                                            <Icon name="User" className="w-4 h-4"/> 选择
-                                        </button>
                                     </div>
+                                    <button 
+                                        onClick={()=>setShowCustomerModal(true)}
+                                        className="bg-indigo-50 text-indigo-600 px-4 py-3 rounded-xl font-bold text-sm btn-press flex items-center gap-1 border border-indigo-100 shadow-sm"
+                                    >
+                                        <Icon name="User" className="w-4 h-4"/> 切换/选择
+                                    </button>
+                                </div>
 
-                                    {/* 空状态提示 (当没有选择客户时显示) */}
-                                    {!inputCustomer && (
-                                        <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg text-sm text-center mb-2 leading-relaxed shadow-sm">
-                                            <div className="font-bold text-lg mb-2">👋 欢迎使用</div>
-                                            {customers.length === 0 ? (
-                                                <>
-                                                    <p>您还没有添加任何客户。</p>
-                                                    <p>请先点击右上角 <strong>[客户管理]</strong> 添加客户。</p>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <p>暂未选择客户，无法录入注单。</p>
-                                                    <p>请点击上方 <strong>[选择]</strong> 按钮指定当前客户。</p>
-                                                </>
-                                            )}
-                                        </div>
-                                    )}
-
+                                {/* 输入区域 */}
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden relative z-10">
                                     <textarea 
                                         value={inputContent} 
                                         onChange={e=>setInputContent(e.target.value)} 
                                         disabled={!inputCustomer}
-                                        className={`w-full p-3 border rounded-lg h-40 font-mono text-sm mb-2 focus:ring-2 focus:ring-indigo-200 outline-none transition-colors ${!inputCustomer ? 'bg-gray-100 cursor-not-allowed' : 'bg-slate-50'}`}
-                                        placeholder={!inputCustomer ? "请先选择客户..." : "粘贴注单内容..."}
+                                        className={`w-full flex-1 p-4 resize-none outline-none text-base font-mono ${!inputCustomer ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'}`}
+                                        placeholder={!inputCustomer ? "请先点击右上方选择客户..." : "在此粘贴或输入注单内容..."}
                                     ></textarea>
                                     
-                                    {previewBatches.length>0 && (
-                                        <div className="bg-slate-100 p-2 rounded mb-2 max-h-32 overflow-y-auto text-xs">
-                                            {previewBatches.map((b,i) => (<div key={i} className="mb-1 pb-1 border-b border-slate-200 last:border-0"><div className="font-bold text-slate-500">{b.header}</div>{b.segments.map((s,j) => <div key={j} className={!s.isValid||s.isSuspicious?'text-red-500 font-bold animate-pulse-slow border border-red-300 bg-red-50 p-1 rounded':''}>{s.rawLine}</div>)}</div>))}
-                                        </div>
-                                    )}
-                                    <div className="flex gap-2">
-                                        <button 
-                                            onClick={handleAddBet} 
-                                            disabled={!inputCustomer}
-                                            className={`flex-1 text-white py-3 rounded-lg font-bold shadow-lg active:scale-95 transition-transform flex items-center justify-center ${!inputCustomer ? 'bg-gray-400' : 'bg-indigo-600'}`}
-                                        >
-                                            <Icon name="Send" className="inline w-4 h-4 mr-1"/> 提交
-                                        </button>
-                                        <button onClick={()=>setInputContent('')} className="px-4 border rounded-lg bg-white text-slate-500"><Icon name="Eraser" className="w-5 h-5"/></button>
-                                        <button onClick={handleClearClick} className="px-4 border border-red-200 bg-white text-red-500 rounded-lg"><Icon name="Trash2" className="w-5 h-5"/></button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {/* Customers Tab */}
-                        {activeTab === 'customers' && (
-                            <div className="space-y-4 pb-20">
-                                {/* 账本筛选器 */}
-                                <div className="bg-white p-2 rounded-xl shadow-sm border border-indigo-50 sticky top-0 z-10 flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex bg-slate-100 rounded-lg p-1">
-                                            <button 
-                                                onClick={() => setBookMode('ALL')} 
-                                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${bookMode === 'ALL' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500'}`}
-                                            >
-                                                全部订单
-                                            </button>
-                                            <button 
-                                                onClick={() => setBookMode('SINGLE')} 
-                                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${bookMode === 'SINGLE' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500'}`}
-                                            >
-                                                指定客户
-                                            </button>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-xs text-slate-400">当前列表总额</div>
-                                            <div className="font-bold text-indigo-600">¥{currentBookTotal}</div>
-                                        </div>
-                                    </div>
-                                    
-                                    {bookMode === 'SINGLE' && (
-                                        <div className="animate-in slide-in-from-top-2 fade-in">
-                                            <select 
-                                                value={bookTarget} 
-                                                onChange={e => setBookTarget(e.target.value)} 
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold text-slate-700 outline-none focus:border-indigo-300"
-                                            >
-                                                {customers.length === 0 && <option value="">暂无客户</option>}
-                                                {customers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                            </select>
+                                    {/* 预览区域 */}
+                                    {previewBatches.length > 0 && (
+                                        <div className="bg-slate-50 border-t border-slate-100 max-h-40 overflow-y-auto p-2 text-xs">
+                                            {previewBatches.map((b,i) => (
+                                                <div key={i} className="mb-2 last:mb-0">
+                                                    <div className="font-bold text-slate-400 px-1">{b.header}</div>
+                                                    
+                                                    {/* v6.66 Update: 智能核对提示框 */}
+                                                    {b.mismatch && (
+                                                        <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded mb-2 flex items-center gap-2 animate-fade-in font-bold">
+                                                            <Icon name="AlertTriangle" className="w-4 h-4 text-red-500"/>
+                                                            <span>客户标额 {b.clientTotalVal} ≠ 系统计算 {b.systemTotal}</span>
+                                                        </div>
+                                                    )}
+
+                                                    {b.segments.map((s,j) => (
+                                                        <div key={j} className={`p-1.5 rounded mb-1 flex justify-between items-center ${!s.isValid||s.isSuspicious ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-white border border-slate-200 text-slate-700'}`}>
+                                                            <span className="break-all flex-1 mr-2">{s.rawLine} {s.hasUnknown && <span className="text-red-500 font-bold">(?)</span>}</span>
+                                                            <span className="font-bold opacity-50">¥{s.amount*s.totalBetCount}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
                                 </div>
 
-                                {displayedCustomerStats.length === 0 ? (
-                                    <div className="text-center py-10 text-slate-400 text-sm">
-                                        {bookMode === 'SINGLE' && !bookTarget ? "请选择一个客户" : "暂无相关注单记录"}
-                                    </div>
-                                ) : (
-                                    displayedCustomerStats.map(cust => (
-                                        <details key={cust.name} open className="bg-white border rounded-xl shadow-sm overflow-hidden group">
-                                            <summary className="flex justify-between items-center p-4 cursor-pointer bg-slate-50 group-open:bg-indigo-50 transition-colors">
-                                                <div className="font-bold text-lg text-slate-800">{cust.name}</div>
-                                                <div className="font-bold text-indigo-600 text-xl">¥{cust.total}</div>
-                                            </summary>
-                                            <div className="p-3 space-y-3 bg-white">
-                                                {cust.batches.map((batch, i) => {
-                                                    const isBatchError = batch.records.some(r => r.isError);
-                                                    return (
-                                                        <div key={batch.batchId} className={`border rounded-lg p-3 ${isBatchError?'bg-red-100 border-red-400 ring-2 ring-red-300 animate-pulse-slow':'bg-slate-50 border-slate-200'}`}>
-                                                            <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200/50">
-                                                                <span className={`font-bold text-sm ${isBatchError?'text-red-800':'text-indigo-700'}`}>#{i+1} 笔: ¥{batch.total}</span>
-                                                                <div className="flex gap-2">
-                                                                    <button onClick={()=>setBatchToEdit(batch.batchId)} className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold border border-yellow-200">修改</button>
-                                                                    {/* v6.33: 使用 handleDeleteBatchWithModal 替代 inline confirm */}
-                                                                    <button onClick={(e)=>{ e.stopPropagation(); handleDeleteBatchWithModal(batch.batchId); }} className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold border border-red-200">删</button>
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-xs font-mono text-slate-600 space-y-1">
-                                                                {batch.records.map((r,ri) => (
-                                                                    <div key={ri} className="flex justify-between gap-2 border-b border-slate-100 last:border-0 pb-1 mb-1 items-start">
-                                                                        <span className={`text-left flex-1 break-all whitespace-pre-wrap ${r.isError?'text-red-600 font-bold':''}`}>
-                                                                            {r.rawInput}
-                                                                            {r.type === 'HK' && <span className="text-red-500 font-bold ml-1 text-xs">(港)</span>}
-                                                                        </span>
-                                                                        <span className="text-slate-400 shrink-0 text-right whitespace-nowrap">{r.isError?'(待核对)':`¥${r.totalAmount}`}</span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </details>
-                                    ))
-                                )}
+                                {/* 底部操作栏 */}
+                                <div className="grid grid-cols-4 gap-2 z-20">
+                                    <button onClick={()=>setInputContent('')} className="col-span-1 bg-white border border-slate-200 text-slate-500 rounded-xl py-3 flex items-center justify-center btn-press shadow-sm font-bold text-sm"><Icon name="Eraser" className="w-5 h-5"/></button>
+                                    <button onClick={handleClearClick} className="col-span-1 bg-white border border-red-100 text-red-500 rounded-xl py-3 flex items-center justify-center btn-press shadow-sm font-bold text-sm"><Icon name="Trash2" className="w-5 h-5"/></button>
+                                    <button onClick={handleAddBet} disabled={!inputCustomer} className={`col-span-2 rounded-xl py-3 flex items-center justify-center btn-press shadow-lg font-bold text-white text-lg gap-2 ${!inputCustomer ? 'bg-slate-300' : 'bg-indigo-600 shadow-indigo-200'}`}><Icon name="Send" className="w-5 h-5"/> 提交录入</button>
+                                </div>
                             </div>
                         )}
-                        {/* Risk Tab */}
+                        {/* ... (Other tabs content remains similar but wrapped properly) ... */}
+                        {activeTab === 'customers' && (
+                            <div className="space-y-4">
+                                <div className="bg-white p-2 rounded-xl shadow-sm border border-indigo-50 sticky top-[72px] z-40 flex flex-col gap-2">
+                                    <div className="flex justify-between items-center"><div className="flex bg-slate-100 rounded-lg p-1"><button onClick={()=>setBookMode('ALL')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${bookMode==='ALL'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}>全部</button><button onClick={()=>setBookMode('SINGLE')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${bookMode==='SINGLE'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}>指定</button></div><div className="text-right"><div className="text-xs text-slate-400">列表总额</div><div className="font-bold text-indigo-600">¥{displayedCustomerStats.reduce((a,c)=>a+c.total,0)}</div></div></div>
+                                    {bookMode==='SINGLE' && <select value={bookTarget} onChange={e=>setBookTarget(e.target.value)} className="w-full bg-slate-50 border rounded-lg p-2 text-sm font-bold text-slate-700 outline-none">{customers.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select>}
+                                </div>
+                                {displayedCustomerStats.map(cust => (
+                                    <details key={cust.name} open className="bg-white border rounded-xl shadow-sm overflow-hidden group">
+                                        <summary className="flex justify-between items-center p-4 cursor-pointer bg-slate-50 group-open:bg-indigo-50 transition-colors"><div className="font-bold text-lg text-slate-800">{cust.name}</div><div className="font-bold text-indigo-600 text-xl">¥{cust.total}</div></summary>
+                                        <div className="p-3 space-y-3 bg-white border-t border-slate-100">{cust.batches.map((batch,i)=><div key={batch.batchId} className={`border rounded-lg p-3 ${batch.records.some(r=>r.isError)?'bg-red-50 border-red-200':'bg-slate-50/50 border-slate-200'}`}><div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200/50"><span className="font-bold text-sm text-slate-600">#{i+1} 笔: ¥{batch.total}</span><div className="flex gap-2"><button onClick={()=>setBatchToEdit(batch.batchId)} className="text-xs bg-white text-yellow-600 px-2.5 py-1 rounded-md border border-yellow-200 font-bold shadow-sm btn-press">改</button><button onClick={(e)=>{e.stopPropagation();handleDeleteBatchWithModal(batch.batchId)}} className="text-xs bg-white text-red-600 px-2.5 py-1 rounded-md border border-red-200 font-bold shadow-sm btn-press">删</button></div></div><div className="text-xs font-mono text-slate-600 space-y-1">{batch.records.map((r,ri)=><div key={ri} className="flex justify-between border-b border-slate-100 last:border-0 pb-1 mb-1 items-start"><span className={`break-all flex-1 mr-2 ${r.isError?'text-red-600 font-bold':''}`}>{r.rawInput}{r.type==='HK'&&<span className="text-red-500 ml-1 text-[10px] bg-red-50 px-1 rounded">港</span>}</span><span className="text-slate-400 shrink-0 font-bold">{r.isError?'(异常)':`¥${r.totalAmount}`}</span></div>)}</div></div>)}</div>
+                                    </details>
+                                ))}
+                            </div>
+                        )}
                         {activeTab === 'risk' && (
-                            <div className="h-[calc(100vh-140px)] flex flex-col">
-                                <div className="flex justify-between mb-2">
-                                    <div className="flex bg-white rounded border p-1 text-xs font-bold">
-                                        <button onClick={()=>setRiskFilter('MO')} className={`px-3 py-1 rounded ${riskFilter==='MO'?'bg-green-500 text-white':''}`}>澳</button>
-                                        <button onClick={()=>setRiskFilter('HK')} className={`px-3 py-1 rounded ${riskFilter==='HK'?'bg-red-500 text-white':''}`}>港</button>
-                                        <button onClick={()=>setRiskFilter('ALL')} className={`px-3 py-1 rounded ${riskFilter==='ALL'?'bg-indigo-500 text-white':''}`}>全</button>
-                                    </div>
-                                    <button onClick={()=>setShowHedgingModal(true)} className="bg-orange-500 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-1"><Icon name="Scale" className="w-4 h-4"/> 智能吃码</button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto grid grid-cols-2 gap-2 pb-24">
-                                     {(riskFilter==='ALL'||riskFilter==='MO') && <MobileRiskTable title="🇲🇴 澳门" color="green" data={riskStats.mo} total={riskStats.moPool} />}
-                                     {(riskFilter==='ALL'||riskFilter==='HK') && <MobileRiskTable title="🇭🇰 香港" color="red" data={riskStats.hk} total={riskStats.hkPool} />}
-                                </div>
+                            <div className="h-full flex flex-col overflow-hidden">
+                                <div className="flex justify-between mb-2 shrink-0"><div className="flex bg-white rounded-lg border p-1 text-xs font-bold shadow-sm"><button onClick={()=>setRiskFilter('MO')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='MO'?'bg-green-500 text-white shadow-sm':'text-slate-500'}`}>澳</button><button onClick={()=>setRiskFilter('HK')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='HK'?'bg-red-500 text-white shadow-sm':'text-slate-500'}`}>港</button><button onClick={()=>setRiskFilter('ALL')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='ALL'?'bg-indigo-500 text-white shadow-sm':'text-slate-500'}`}>全</button></div><button onClick={()=>setShowHedgingModal(true)} className="bg-orange-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-md shadow-orange-200 btn-press"><Icon name="Scale" className="w-4 h-4"/> 智能吃码</button></div>
+                                <div className="flex-1 overflow-y-auto grid grid-cols-2 gap-3 pb-24">{(riskFilter==='ALL'||riskFilter==='MO')&&<MobileRiskTable title="🇲🇴 澳门" color="green" data={riskStats.mo} total={riskStats.moPool} />}{(riskFilter==='ALL'||riskFilter==='HK')&&<MobileRiskTable title="🇭🇰 香港" color="red" data={riskStats.hk} total={riskStats.hkPool} />}</div>
                             </div>
                         )}
-                        {/* Reconciliation Tab */}
                         {activeTab === 'reconciliation' && (
-                            <div className="pb-24">
-                                <div className="bg-white p-4 rounded-xl shadow mb-4 sticky top-0 z-10">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><div className="text-xs text-green-600 font-bold text-center mb-1">🇲🇴 澳门开奖</div><input type="number" value={winningNumberMO} onChange={e=>setWinningNumberMO(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-green-100 rounded-lg py-2 text-green-600"/></div>
-                                        <div><div className="text-xs text-red-600 font-bold text-center mb-1">🇭🇰 香港开奖</div><input type="number" value={winningNumberHK} onChange={e=>setWinningNumberHK(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-red-100 rounded-lg py-2 text-red-600"/></div>
-                                    </div>
-                                </div>
+                            <div className="space-y-4">
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 sticky top-[72px] z-40 grid grid-cols-2 gap-4"><div><div className="text-xs text-green-600 font-bold text-center mb-1">🇲🇴 澳彩开奖</div><input type="number" placeholder="输入" value={winningNumberMO} onChange={e=>setWinningNumberMO(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-green-100 rounded-xl py-2 text-green-600 focus:border-green-300 outline-none bg-green-50/30"/></div><div><div className="text-xs text-red-600 font-bold text-center mb-1">🇭🇰 港彩开奖</div><input type="number" placeholder="输入" value={winningNumberHK} onChange={e=>setWinningNumberHK(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-red-100 rounded-xl py-2 text-red-600 focus:border-red-300 outline-none bg-red-50/30"/></div></div>
                                 <div className="space-y-3">
-                                    {reconciliationStats.length === 0 ? <div className="text-center text-slate-400 py-10">暂无注单数据，请先录入</div> : reconciliationStats.map(s => (
-                                        <div key={s.name} className="bg-white rounded-lg shadow p-3" onClick={()=>setExpandedReconciliation(expandedReconciliation===s.name?null:s.name)}>
-                                            <div className="flex justify-between items-center border-b pb-2 mb-2">
-                                                <div className="font-bold text-lg">{s.name}</div>
+                                    {reconciliationStats.map(s => (
+                                        <div key={s.name} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 group" onClick={()=>setExpandedReconciliation(expandedReconciliation===s.name?null:s.name)}>
+                                            <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
+                                                <div className="font-bold text-lg text-slate-800">{s.name}</div>
                                                 <div className={`font-bold text-xl ${s.profit>=0?'text-red-600':'text-green-600'}`}>{s.profit>=0?'+':''}{s.profit.toFixed(0)}</div>
                                             </div>
                                             <div className="grid grid-cols-3 gap-2 text-xs text-center mb-2">
-                                                <div className="bg-slate-50 p-1 rounded">流水: {s.totalStake}</div>
-                                                <div className="bg-slate-50 p-1 rounded text-indigo-600 font-bold">中特: {s.winningStakeTotal}</div>
-                                                <div className="bg-slate-50 p-1 rounded">退水: {s.rebateAmt.toFixed(0)}</div>
+                                                <div className="bg-slate-50 p-1.5 rounded-lg font-bold text-slate-600">流水: {s.totalStake}</div>
+                                                <div className="bg-indigo-50 p-1.5 rounded-lg text-indigo-600 font-bold border border-indigo-100">中: {s.winningStakeTotal}</div>
+                                                <div className="bg-slate-50 p-1.5 rounded-lg text-slate-500">退: {s.rebateAmt.toFixed(0)}</div>
                                             </div>
                                             {expandedReconciliation===s.name && (
-                                                <div className="bg-slate-50 p-2 rounded text-xs font-mono mt-2 space-y-1 max-h-96 overflow-y-auto">
-                                                    <div className="flex flex-col gap-4">
+                                                <div className="bg-slate-50 p-3 rounded-xl text-xs font-mono mt-2 space-y-2 border border-slate-100 animate-fade-in">
+                                                    <div className="flex flex-col gap-3">
                                                         {s.batchDetails.map(b => {
                                                             const winTot = b.winHK+b.winMO;
                                                             let winLbl = '';
                                                             if(winTot>0) {
-                                                                if(b.winHK>0 && b.winMO>0) winLbl=`[中: ¥${winTot} (港${b.winHK}+门${b.winMO})]`; // v6.24: Use "门" instead of "澳" for contrast
+                                                                if(b.winHK>0 && b.winMO>0) winLbl=`[中: ¥${winTot} (港${b.winHK}+门${b.winMO})]`;
                                                                 else if(b.winHK>0) winLbl=`[中: ¥${winTot} (港)]`;
-                                                                else winLbl=`[中: ¥${winTot}]`; // v6.24: No label for pure Macau win
+                                                                else winLbl=`[中: ¥${winTot}]`;
                                                             }
                                                             return (
-                                                                <div key={b.idx} className="flex justify-start items-center border-b border-slate-200 last:border-0 pb-2 pt-1 gap-6 break-inside-avoid" onClick={(e)=>{e.stopPropagation();setViewingRawBatch(b)}}>
-                                                                    <span className="font-bold text-slate-700 text-sm whitespace-nowrap">({b.idx}) 合计: {b.total}</span>
-                                                                    {winTot>0 && <span className="text-red-600 font-bold text-sm">{winLbl}</span>}
+                                                                <div key={b.idx} className="flex justify-between items-start border-b border-slate-200 last:border-0 pb-1" onClick={(e)=>{e.stopPropagation();setViewingRawBatch(b)}}>
+                                                                    <span className="font-bold text-slate-600">({b.idx}) 合计: {b.total}</span>
+                                                                    {winTot>0 && <span className="text-red-600 font-bold bg-red-50 px-1 rounded">{winLbl}</span>}
                                                                 </div>
                                                             );
                                                         })}
                                                     </div>
-                                                    <button onClick={(e)=>{e.stopPropagation(); copyRec(s);}} className="w-full mt-4 bg-indigo-600 text-white py-2 rounded font-bold">复制详单</button>
+                                                    <button onClick={(e)=>{e.stopPropagation(); copyRec(s);}} className="w-full mt-2 bg-indigo-600 text-white py-2.5 rounded-lg font-bold shadow-md shadow-indigo-200 btn-press flex items-center justify-center gap-1"><Icon name="Copy" className="w-4 h-4"/> 复制完整对账单</button>
                                                 </div>
                                             )}
                                         </div>
@@ -1362,84 +738,21 @@
                             </div>
                         )}
                     </div>
-                    
-                    {/* 底部导航栏 */}
-                    <div id="bottom-nav" className="bg-white border-t grid grid-cols-4 py-2 shadow-lg text-xs pb-safe">
-                        <button onClick={()=>setActiveTab('reconciliation')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='reconciliation'?'text-indigo-600 font-bold':'text-slate-400'}`}><Icon name="ClipboardCheck" className="w-6 h-6"/>对账</button>
-                        <button onClick={()=>setActiveTab('input')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='input'?'text-indigo-600 font-bold':'text-slate-400'}`}><Icon name="Zap" className="w-6 h-6"/>录入</button>
-                        <button onClick={()=>setActiveTab('customers')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='customers'?'text-indigo-600 font-bold':'text-slate-400'}`}><Icon name="BookOpen" className="w-6 h-6"/>账本</button>
-                        <button onClick={()=>setActiveTab('risk')} className={`flex-1 flex flex-col items-center gap-1 p-2 ${activeTab==='risk'?'text-indigo-600 font-bold':'text-slate-400'}`}><Icon name="ShieldAlert" className="w-6 h-6"/>风控</button>
-                    </div>
-                    
-                    {/* 模态框区域 */}
-                    {showCustomerModal && (
-                        <CustomerSelectModal 
-                            customers={customers} 
-                            onSelect={handleSelectCustomer} 
-                            onClose={() => setShowCustomerModal(false)} 
-                        />
-                    )}
-                    {actionSheet && (
-                        <ActionSheet 
-                            title={actionSheet.title}
-                            actions={actionSheet.actions}
-                            onCancel={actionSheet.onCancel}
-                        />
-                    )}
-                    {showSettings && (
-                        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 modal-overlay">
-                            <div className="bg-white w-full max-w-lg rounded-xl p-4 max-h-[80vh] overflow-y-auto">
-                                <div className="flex justify-between items-center mb-4 pb-2 border-b">
-                                    <h3 className="font-bold text-lg">客户管理</h3>
-                                    <button onClick={()=>setShowSettings(false)}><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
-                                </div>
-                                <div className="space-y-2">
-                                    {tempCustomers.map(c => (
-                                        <div key={c.id} className="flex gap-2 items-center">
-                                            <input value={c.name} onChange={e=>handleUpdateCustomerField(c.id,'name',e.target.value)} className="border p-2 rounded w-24 text-sm" placeholder="姓名"/>
-                                            <input type="number" value={isNaN(c.odds)?'':c.odds} onChange={e=>handleUpdateCustomerField(c.id,'odds',parseFloat(e.target.value)||0)} className="border p-2 rounded w-16 text-sm" placeholder="赔率"/>
-                                            <input type="number" value={isNaN(c.rebate)?'':c.rebate*100} onChange={e=>handleUpdateCustomerField(c.id,'rebate',(parseFloat(e.target.value)||0)/100)} className="border p-2 rounded w-16 text-sm" placeholder="退水%"/>
-                                            <button onClick={()=>setTempCustomers(prev=>prev.filter(x=>x.id!==c.id))}><Icon name="Trash2" className="w-5 h-5 text-red-500"/></button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-4 flex gap-2">
-                                    <button onClick={()=>setTempCustomers([...tempCustomers, {id:Math.random().toString(),name:'',customerType:'客户',odds:47.5,rebate:0.1,aliases:[]}])} className="flex-1 bg-green-500 text-white py-2 rounded font-bold">新增客户</button>
-                                    <button onClick={handleSaveCustomers} className="flex-1 bg-blue-500 text-white py-2 rounded font-bold">保存设置</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    {textPreview && (
-                        <div className="fixed inset-0 bg-black/50 z-[3000] flex items-center justify-center p-4 modal-overlay animate-in fade-in">
-                            <div className="bg-white w-full max-w-sm rounded-xl p-4 shadow-2xl flex flex-col h-[60vh]">
-                                <div className="flex justify-between items-center border-b pb-2 mb-2">
-                                    <h3 className="font-bold text-lg text-slate-800">{textPreview.title}</h3>
-                                    <button onClick={()=>setTextPreview(null)}><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
-                                </div>
-                                <textarea 
-                                    className="flex-1 w-full p-3 border rounded-lg bg-slate-50 font-mono text-sm resize-none focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    value={textPreview.content}
-                                    onChange={(e) => setTextPreview({...textPreview, content: e.target.value})}
-                                />
-                                <div className="flex gap-3 mt-4 shrink-0">
-                                    <button onClick={()=>setTextPreview(null)} className="flex-1 py-3 border rounded-lg font-bold text-slate-500">关闭</button>
-                                    <button onClick={()=>{
-                                         const el = document.createElement('textarea');
-                                         el.value = textPreview.content; document.body.appendChild(el); el.select();
-                                         document.execCommand('copy'); document.body.removeChild(el);
-                                         showAlert('再次复制成功', 'success');
-                                    }} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg flex items-center justify-center gap-2">
-                                        <Icon name="Copy" className="w-4 h-4"/> 再次复制
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                     {batchToEdit && <EditOrderModal batchId={batchToEdit} onClose={()=>setBatchToEdit(null)} onSave={handleSaveEditedBatch} bets={bets} parseContentForSegments={(t,a)=>parseContentForSegments(t,a,currentYearZodiac)} />}
                     {viewingRawBatch && <RawRecordModal batch={viewingRawBatch} onClose={()=>setViewingRawBatch(null)} />}
                     {showHedgingModal && <HedgingModal onClose={()=>setShowHedgingModal(false)} riskStats={riskStats} riskFilter={riskFilter} customers={customers} bets={bets} showAlert={showAlert} />}
                     <ConfirmationModal confirmation={confirmation} />
+                    {showCustomerModal && <CustomerSelectModal customers={customers} onSelect={n=>{setInputCustomer(n);setShowCustomerModal(false);showAlert(`已切换: ${n}`, 'success')}} onClose={()=>setShowCustomerModal(false)} />}
+                    {actionSheet && <ActionSheet title={actionSheet.title} actions={actionSheet.actions} onCancel={actionSheet.onCancel} />}
+                    {showSettings && <div id="app-modal" className="flex items-center justify-center p-4 animate-fade-in"><div className="bg-white w-full max-w-lg rounded-xl p-4 max-h-[80vh] overflow-y-auto"><div className="flex justify-between items-center mb-4 pb-2 border-b"><h3 className="font-bold text-lg">客户管理</h3><button onClick={()=>setShowSettings(false)} className="btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button></div><div className="space-y-2">{tempCustomers.map(c=><div key={c.id} className="flex gap-2 items-center"><input value={c.name} onChange={e=>setTempCustomers(p=>p.map(x=>x.id===c.id?{...x,name:e.target.value}:x))} className="border p-2 rounded w-24 text-sm" placeholder="姓名"/><input type="number" value={isNaN(c.odds)?'':c.odds} onChange={e=>setTempCustomers(p=>p.map(x=>x.id===c.id?{...x,odds:parseFloat(e.target.value)||0}:x))} className="border p-2 rounded w-16 text-sm"/><input type="number" value={isNaN(c.rebate)?'':c.rebate*100} onChange={e=>setTempCustomers(p=>p.map(x=>x.id===c.id?{...x,rebate:(parseFloat(e.target.value)||0)/100}:x))} className="border p-2 rounded w-16 text-sm"/><button onClick={()=>setTempCustomers(p=>p.filter(x=>x.id!==c.id))} className="btn-press"><Icon name="Trash2" className="w-5 h-5 text-red-500"/></button></div>)}</div><div className="mt-4 flex gap-2"><button onClick={()=>setTempCustomers(p=>[...p,{id:Math.random().toString(),name:'',customerType:'客户',odds:47.5,rebate:0.1,aliases:[]}])} className="flex-1 bg-green-500 text-white py-2 rounded font-bold btn-press">新增</button><button onClick={()=>{setCustomers(tempCustomers);setShowSettings(false)}} className="flex-1 bg-blue-500 text-white py-2 rounded font-bold btn-press">保存</button></div></div></div>}
+                    {textPreview && <div id="app-modal" className="flex items-center justify-center p-4 animate-fade-in"><div className="bg-white w-full max-w-sm rounded-xl p-4 shadow-2xl flex flex-col h-[60vh]"><div className="flex justify-between items-center border-b pb-2 mb-2"><h3 className="font-bold text-lg">{textPreview.title}</h3><button onClick={()=>setTextPreview(null)} className="btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button></div><textarea className="flex-1 w-full p-3 border rounded-lg bg-slate-50 font-mono text-sm resize-none" value={textPreview.content} onChange={e=>setTextPreview({...textPreview,content:e.target.value})}/><div className="flex gap-3 mt-4"><button onClick={()=>setTextPreview(null)} className="flex-1 py-3 border rounded-lg font-bold text-slate-500 btn-press">关闭</button><button onClick={()=>{const el=document.createElement('textarea');el.value=textPreview.content;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);showAlert('复制成功','success')}} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg flex items-center justify-center gap-2 btn-press"><Icon name="Copy" className="w-4 h-4"/> 复制</button></div></div></div>}
+                    
+                    <div id="bottom-nav" className="bg-white border-t grid grid-cols-4 py-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] text-xs pb-safe">
+                        <button onClick={()=>setActiveTab('reconciliation')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='reconciliation'?'text-indigo-600 font-bold scale-105':'text-slate-400'}`}><Icon name="ClipboardCheck" className="w-6 h-6"/>对账</button>
+                        <button onClick={()=>setActiveTab('input')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='input'?'text-indigo-600 font-bold scale-105':'text-slate-400'}`}><Icon name="Zap" className="w-6 h-6"/>录入</button>
+                        <button onClick={()=>setActiveTab('customers')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='customers'?'text-indigo-600 font-bold scale-105':'text-slate-400'}`}><Icon name="BookOpen" className="w-6 h-6"/>账本</button>
+                        <button onClick={()=>setActiveTab('risk')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='risk'?'text-indigo-600 font-bold scale-105':'text-slate-400'}`}><Icon name="ShieldAlert" className="w-6 h-6"/>风控</button>
+                    </div>
                 </div>
             );
         }
