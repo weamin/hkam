@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>订单管理系统 v8.0</title>
+    <title>订单管理系统 v7.16 (管理员功能修复版)</title>
     
     <!-- 1. 安全卫士 (已激活 - 防白嫖模式) -->
     <script>
@@ -222,7 +222,21 @@
                 if (!isNaN(n) && n>=1 && n<=49 && !/^[岁尾头]$/.test(t.slice(-1))) { nums.push(n); count++; return; }
                 if (KEYWORDS[t]) { KEYWORDS[t].forEach(x=>nums.push(x)); count+=KEYWORDS[t].length; return; }
                 if (ZODIAC_LIST.includes(t)) { getNumbersForZodiac(t, currentYearZodiac).forEach(x=>nums.push(x)); count+=getNumbersForZodiac(t, currentYearZodiac).length; return; }
-                if (t.endsWith('岁')) { const a=parseInt(t); if(!isNaN(a)) for(let x=a;x<=49;x+=12) if(x>0){nums.push(x);count++} return; }
+                
+                // 修改：岁数逻辑增加了严格校验 (1-12)
+                if (t.endsWith('岁')) { 
+                    const a=parseInt(t); 
+                    if(!isNaN(a)) {
+                        // 规则：岁只能是 1-12，超出范围（如 612 或 26）视为异常，提示用户核对
+                        if (a < 1 || a > 12) {
+                            hasUnknown = true;
+                        } else {
+                            for(let x=a;x<=49;x+=12) if(x>0){nums.push(x);count++} 
+                        }
+                    }
+                    return; 
+                }
+
                 if (t.endsWith('尾')||t.endsWith('头')) { const v=parseInt(t); if(!isNaN(v)) { const isT=t.endsWith('尾'); for(let i=(isT?1:0);i<=49;i++) if(i>0 && (isT?i%10===v:Math.floor(i/10)===v)){nums.push(i);count++} } return; }
                 if (!isNaN(n) && (n<1 || n>49)) hasUnknown=true;
             });
@@ -289,7 +303,6 @@
         
         // --- 修改 EditOrderModal 组件，支持“插入独立新订单” ---
         const EditOrderModal = ({ batchId, onClose, onSave, onInsertNew, bets, currentYearZodiac }) => { 
-            // ... (keep existing code)
             const recs = bets.filter(b=>b.batchId===batchId); 
             const [lines, setLines] = useState(Array.from(new Set(recs.map(r=>r.rawInput))).filter(l=>l)); 
             const [showInsert, setShowInsert] = useState(false); // 控制插入界面的显示
@@ -390,7 +403,6 @@
                 </ModalContainer> 
             ); 
         };
-        // ... (keep existing InsertOrderModal, RawRecordModal, HedgingModal) ...
         const InsertOrderModal = ({ customerName, onClose, onSave }) => {
             const [text, setText] = useState('');
             return (
@@ -515,7 +527,6 @@
             return ( <div className="min-h-screen login-bg flex items-center justify-center p-4"> <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in"> <div className="text-center"> <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner"> <Icon name="Zap" className="w-8 h-8"/> </div> <h1 className="text-2xl font-bold text-gray-800">系统登录</h1> <p className="text-gray-400 text-sm mt-2">请输入管理员提供的访问码</p> </div> <div className="space-y-4"> <input type="text" value={code} onChange={e=>setCode(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none py-4 tracking-widest bg-gray-50 focus:bg-white transition-all text-indigo-900" placeholder="输入访问码" /> <button onClick={handleLogin} disabled={loading} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all btn-press disabled:opacity-50 disabled:cursor-not-allowed"> {loading ? "正在验证..." : "进入系统"} </button> </div> <div className="text-center text-xs text-gray-300 pt-4">v7.16 (管理员功能修复版)</div> </div> </div> ); };
 
         function App() {
-            // ... (keep existing state)
             const [userCode, setUserCode] = useState(localStorage.getItem('lottery_user_code') || null);
             const [isAdmin, setIsAdmin] = useState(false);
             const [sessionID, setSessionID] = useState(localStorage.getItem('lottery_session_id') || null);
@@ -537,7 +548,7 @@
             // 新增：自动聚焦的批次ID
             const [focusBatchId, setFocusBatchId] = useState(null);
 
-            // ... (keep useEffect for parsing input) ...
+            // --- 核心业务逻辑 (直接调用外置函数) ---
             useEffect(() => {
                 const txt = inputContent.trim();
                 if (!txt) { setPreviewBatches([]); return; }
@@ -555,7 +566,7 @@
                 setPreviewBatches(previews);
             }, [inputContent, defaultAmount, currentYearZodiac]);
 
-            // ... (keep riskStats, customerStats, displayedCustomerStats) ...
+            // --- 恢复被遗漏的核心统计逻辑 ---
             const riskStats = useMemo(() => {
                 const hk=Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0})), mo=Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0}));
                 let [tpH,trH,tpM,trM]=[0,0,0,0];
@@ -584,7 +595,6 @@
             }, [bets]);
             const displayedCustomerStats = useMemo(() => bookMode==='ALL' ? customerStats : customerStats.filter(c=>c.name===bookTarget), [customerStats, bookMode, bookTarget]);
 
-            // ... (keep reconciliationStats, copyRec) ...
             const reconciliationStats = useMemo(() => {
                 const [wh, wm] = [parseInt(winningNumberHK), parseInt(winningNumberMO)];
                 const stats = [];
@@ -695,6 +705,9 @@
                         const updated = [...p, ...newBets];
                         return updated;
                     });
+
+                    // --- 修改：无论是否有异常，只要提交了就清空输入框 ---
+                    setInputContent(''); 
                     
                     if (firstErrorBatchId) {
                         // 发现异常：聚焦到该用户，设置高亮ID，切换标签
@@ -705,8 +718,6 @@
                         showAlert(`提交成功，但存在异常订单，请核对！`, 'warning');
                     } else {
                         showAlert(`成功提交！共 ¥${total}`, 'success'); 
-                        // 如果没有异常，清空输入框
-                        setInputContent(''); 
                         setActiveTab('customers');
                     }
                 } catch (err) {
@@ -715,7 +726,6 @@
                 }
             };
 
-            // ... (keep handleSaveEditedBatch, handleInsertBatchAfter, handleInsertBatch(duplicate name fixed below), handleTransferBatch, handleSaveTransfers) ...
             const handleSaveEditedBatch = (batchId, lines) => {
                 const oldBatch = bets.find(b=>b.batchId===batchId); if(!oldBatch) return;
                 const newRecs = []; 
@@ -867,7 +877,6 @@
                 }
             };
 
-            // ... (keep login/logout/etc)
             const handleLoginSuccess = async (code, initialData) => {
                 const newSid = Math.random().toString(36).substring(2) + Date.now().toString(36);
                 if (window.isFirebaseReady) {
