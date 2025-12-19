@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>订单管理系统 v7.16 (管理员功能修复版)</title>
+    <title>订单管理系统 v8.0</title>
     
     <!-- 1. 安全卫士 (已激活 - 防白嫖模式) -->
     <script>
@@ -417,8 +417,77 @@
         const RawRecordModal = ({ batch, onClose }) => ( <ModalContainer> <div className="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl"> <h3 className="font-bold text-lg mb-4 border-b pb-2">原始下单记录</h3> <div className="bg-slate-100 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto text-slate-700"> <div className="font-bold mb-2 text-slate-900">{batch.header}</div> {batch.originalTotal && <div className="text-orange-600 font-bold mb-2">手写总计: {batch.originalTotal}</div>} <pre className="whitespace-pre-wrap break-all">{batch.fullText || batch.lines.join('\n')}</pre> </div> <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow btn-press">关闭</button> </div> </ModalContainer> );
         const HedgingModal = ({ onClose, riskStats, riskFilter, customers, bets, showAlert, transfers, onSaveTransfers }) => { const [activeType, setActiveType] = useState(riskFilter==='HK'?'HK':'MO'); const [hedgingTarget, setHedgingTarget] = useState('ALL'); const [maxLossLimit, setMaxLossLimit] = useState('0'); const [maxBetLimit, setMaxBetLimit] = useState('500'); const [copyMsg, setCopyMsg] = useState(''); const [transferHistory, setTransferHistory] = useState({}); const [suggestedEat, setSuggestedEat] = useState(0); const activeCustomers = useMemo(() => Array.from(new Set(bets.map(b => b.customerName))).sort(), [bets]); useEffect(() => setTransferHistory({}), [activeType]); const currentRiskStats = useMemo(() => { let filtered = bets.filter(b => !b.isError && !b.isTransferred); if (hedgingTarget !== 'ALL') filtered = filtered.filter(b => b.customerName === hedgingTarget); const stats = { hk:Array.from({length:49},(_,i)=>({num:i+1, totalBet:0})), mo:Array.from({length:49},(_,i)=>({num:i+1, totalBet:0})) }; let [hkTotalPool, moTotalPool] = [0,0]; filtered.forEach(b => { if(b.type==='HK'){ hkTotalPool+=b.totalAmount; } else { moTotalPool+=b.totalAmount; } b.numbers.forEach(n=>{ if(n>=1&&n<=49){ const t=b.type==='HK'?stats.hk[n-1]:stats.mo[n-1]; t.totalBet+=b.amountPerNumber; } }); }); const enrich = (list, type, rawTotalPool) => { const totalTransferred = Object.values(transfers[type] || {}).reduce((a,b)=>a+b, 0); return list.map(i => { const transferred = transfers[type]?.[i.num] || 0; const netBet = Math.max(0, i.totalBet - transferred); return { ...i, transferred, netBet }; }).sort((a,b)=>b.netBet-a.netBet); }; return { hk: { list: enrich(stats.hk, 'HK'), pool: hkTotalPool }, mo: { list: enrich(stats.mo, 'MO'), pool: moTotalPool } }; }, [bets, customers, hedgingTarget, transfers]); const { list: data, pool: rawTotalPool } = activeType === 'HK' ? currentRiskStats.hk : currentRiskStats.mo; const displayData = useMemo(() => { const limit = parseFloat(maxBetLimit) || 0; const processed = data.map(d => { const advice = Math.max(0, d.netBet - limit); const postTransferHolding = d.netBet - advice; return { ...d, advice, postTransferHolding }; }); const finalPool = processed.reduce((acc, d) => acc + d.postTransferHolding, 0); return processed.map(d => { const payout = d.postTransferHolding * 48; const bankerPL = finalPool - payout; return { ...d, bankerPL, finalPool }; }); }, [data, maxBetLimit, rawTotalPool]); useEffect(() => { const currentPool = data.reduce((acc, d) => acc + d.netBet, 0); const suggested = Math.floor(currentPool / 24); setSuggestedEat(suggested > 0 ? suggested : 0); }, [data]); const maxWin = Math.max(...displayData.map(d => d.bankerPL)); const maxLoss = Math.min(...displayData.map(d => d.bankerPL)); const copyAndSave = () => { const toTransfer = displayData.filter(d => d.advice > 0); if (toTransfer.length === 0) { showAlert("没有需要转出的注单", "warning"); return; } const lines = toTransfer.map(d => `${d.num}=${d.advice}`); const el = document.createElement('textarea'); el.value = lines.join(' '); document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); const newTransfers = { ...transfers }; if (!newTransfers[activeType]) newTransfers[activeType] = {}; toTransfer.forEach(d => { newTransfers[activeType][d.num] = (newTransfers[activeType][d.num] || 0) + d.advice; }); onSaveTransfers(newTransfers); setCopyMsg('已复制并保存!'); setTimeout(()=>setCopyMsg(''), 2000); }; const renderPL = (val) => { const rounded = Math.round(val); return <span className={rounded >= 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}>{rounded > 0 ? '+'+rounded : rounded}</span> }; return ( <ModalContainer> <div className="bg-white z-[5000] flex flex-col w-full h-[100dvh]"> <div className="p-3 bg-slate-100 border-b flex justify-between items-center shrink-0"><h3 className="font-bold flex items-center gap-2 text-base"><Icon name="Scale" className="w-5 h-5"/> 智能转单 v7.09</h3><button onClick={onClose} className="btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button></div> <div className="bg-blue-50 p-2 text-xs grid grid-cols-2 gap-x-4 border-b border-blue-100 shrink-0"> <div><div className="flex justify-between"><span>转后最大赢:</span>{renderPL(maxWin)}</div></div> <div><div className="flex justify-between"><span>转后最大赔:</span>{renderPL(maxLoss)}</div></div> </div> <div className="bg-white p-2 text-sm grid grid-cols-2 gap-4 border-b border-slate-100 shrink-0"> <div className="flex flex-col gap-1"> <span className="text-slate-500 text-xs">建议吃码:</span> <span className="text-green-600 font-bold text-lg">{suggestedEat}</span> </div> <div className="flex flex-col gap-1"> <span className="text-slate-500 text-xs">最大吃码 (手动):</span> <input type="number" value={maxBetLimit} onChange={e=>setMaxBetLimit(e.target.value)} className="w-full border-b-2 border-indigo-300 bg-transparent font-bold text-indigo-700 text-lg outline-none focus:border-indigo-600"/> </div> </div> <div className="p-2 bg-white shrink-0 flex justify-between items-center border-b"> <div className="flex border rounded overflow-hidden text-xs font-bold"><button onClick={()=>setActiveType('MO')} className={`px-3 py-1.5 ${activeType==='MO'?'bg-green-500 text-white':'bg-slate-100 text-slate-600'}`}>澳门</button><button onClick={()=>setActiveType('HK')} className={`px-3 py-1.5 ${activeType==='HK'?'bg-red-500 text-white':'bg-slate-100 text-slate-600'}`}>香港</button></div> <select className="border rounded px-2 py-1 text-xs max-w-[120px]" value={hedgingTarget} onChange={e=>setHedgingTarget(e.target.value)}><option value="ALL">全部订单</option><optgroup label="下注客户">{activeCustomers.map(n=><option key={n} value={n}>{n}</option>)}</optgroup></select> </div> <div className="flex-1 overflow-y-auto p-0 bg-slate-50"> <table className="w-full text-xs text-center border-collapse compact-table"><thead className="bg-slate-200 sticky top-0 z-10"><tr><th className="w-8">号</th><th>总注</th><th>已转</th><th>实持</th><th>本次</th><th>转后险 (庄家)</th></tr></thead> <tbody className="divide-y divide-slate-200 bg-white">{displayData.map(d=><tr key={d.num} className={d.advice>0?'bg-orange-50':''}><td className="font-bold border-r bg-slate-50">{d.num}</td><td className="text-slate-400">{d.totalBet}</td><td className="text-slate-400">{d.transferred}</td><td className="font-bold">{d.netBet}</td><td className="text-orange-600 font-bold">{d.advice>0?d.advice:'-'}</td><td className="font-bold">{renderPL(d.bankerPL)}</td></tr>)}</tbody> </table> </div> <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding flex gap-2"><button onClick={onClose} className="w-20 bg-slate-100 border rounded-xl font-bold btn-press">关闭</button><button onClick={copyAndSave} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow flex items-center justify-center gap-2 btn-press"><Icon name="ClipboardCheck" className="w-5 h-5"/> {copyMsg||`复制并保存 (${displayData.filter(d=>d.advice>0).length})`}</button></div> </div> </ModalContainer> ); };
 
-        // ... (keep AdminPanel, LoginScreen) ...
-        const AdminPanel = ({ onClose, db }) => { const [code, setCode] = useState(''); const [days, setDays] = useState(30); const [codes, setCodes] = useState([]); const fetchCodes = async () => { if(!db || !window.fb) return; try { const snap = await window.fb.getDocs(window.fb.collection(db, ...window.DB_PATH.getCollectionArgs("access_codes"))); setCodes(snap.docs.map(d => ({id: d.id, ...d.data()}))); } catch(e) { alert("获取数据失败: " + e.message); } }; useEffect(() => { fetchCodes(); }, []); const handleCreate = async () => { if(!code) return; if(!db || !window.fb) { alert("数据库未连接"); return; } const expiry = new Date(); expiry.setDate(expiry.getDate() + parseInt(days)); await window.fb.setDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", code)), { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} } }); alert("访问码 " + code + " 创建成功！"); fetchCodes(); setCode(''); }; const handleDelete = async (id) => { if(confirm("确定删除 " + id + " 吗？此操作不可恢复！")) { await window.fb.deleteDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id))); fetchCodes(); } }; return ( <div className="fixed inset-0 bg-white z-[5000] p-4 flex flex-col animate-fade-in"> <div className="flex justify-between items-center mb-4 border-b pb-2"> <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="Lock" className="w-6 h-6"/> 管理员控制台</h2> <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6"/></button> </div> <div className="mb-6 p-4 bg-indigo-50 rounded-xl space-y-4 shadow-sm border border-indigo-100"> <h3 className="font-bold text-indigo-900 flex items-center gap-2"><Icon name="UserPlus" className="w-5 h-5"/> 生成新访问码</h3> <div className="flex gap-2"> <input value={code} onChange={e=>setCode(e.target.value)} placeholder="设置用户密码 (如: 8888)" className="border p-3 rounded-lg flex-1 outline-none focus:ring-2 focus:ring-indigo-500"/> <select value={days} onChange={e=>setDays(e.target.value)} className="border p-3 rounded-lg bg-white outline-none"> <option value="1">1天</option> <option value="7">7天</option> <option value="30">30天</option> <option value="365">1年</option> </select> </div> <button onClick={handleCreate} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md btn-press">创建用户账号</button> </div> <div className="flex-1 overflow-y-auto"> <h3 className="font-bold mb-3 text-gray-700 px-1">已存在的用户列表</h3> {codes.map(c => ( <div key={c.id} className="flex justify-between items-center p-4 border-b bg-white hover:bg-gray-50 transition-colors"> <div> <div className="font-bold text-lg text-gray-800">{c.id}</div> <div className="text-xs text-gray-400 mt-1">有效期至: {new Date(c.expiresAt).toLocaleDateString()}</div> </div> <button onClick={()=>handleDelete(c.id)} className="text-red-500 bg-red-50 p-2 rounded-lg btn-press"><Icon name="Trash2" className="w-5 h-5"/></button> </div> ))} </div> </div> ); };
+        const AdminPanel = ({ onClose, db }) => { 
+            const [code, setCode] = useState(''); 
+            const [days, setDays] = useState(30); 
+            const [codes, setCodes] = useState([]); 
+            
+            const fetchCodes = async () => { 
+                if(!db || !window.fb) return; 
+                try { 
+                    const snap = await window.fb.getDocs(window.fb.collection(db, ...window.DB_PATH.getCollectionArgs("access_codes"))); 
+                    setCodes(snap.docs.map(d => ({id: d.id, ...d.data()}))); 
+                } catch(e) { alert("获取数据失败: " + e.message); } 
+            }; 
+            
+            useEffect(() => { fetchCodes(); }, []); 
+            
+            const handleCreate = async () => { 
+                if(!code) return; 
+                if(!db || !window.fb) { alert("数据库未连接"); return; } 
+                const expiry = new Date(); 
+                expiry.setDate(expiry.getDate() + parseInt(days)); 
+                await window.fb.setDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", code)), { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} } }); 
+                alert("访问码 " + code + " 创建成功！"); 
+                fetchCodes(); 
+                setCode(''); 
+            }; 
+            
+            const handleDelete = async (id) => { 
+                if(confirm("确定删除 " + id + " 吗？此操作不可恢复！")) { 
+                    await window.fb.deleteDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id))); 
+                    fetchCodes(); 
+                } 
+            }; 
+            
+            return ( 
+                <div className="fixed inset-0 bg-white z-[5000] p-4 flex flex-col animate-fade-in"> 
+                    <div className="flex justify-between items-center mb-4 border-b pb-2"> 
+                        <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="Lock" className="w-6 h-6"/> 管理员控制台</h2> 
+                        <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6"/></button> 
+                    </div> 
+                    <div className="mb-6 p-4 bg-indigo-50 rounded-xl space-y-4 shadow-sm border border-indigo-100"> 
+                        <h3 className="font-bold text-indigo-900 flex items-center gap-2"><Icon name="UserPlus" className="w-5 h-5"/> 生成新访问码</h3> 
+                        <div className="flex gap-2"> 
+                            <input value={code} onChange={e=>setCode(e.target.value)} placeholder="设置用户密码 (如: 8888)" className="border p-3 rounded-lg flex-1 outline-none focus:ring-2 focus:ring-indigo-500"/> 
+                            <select value={days} onChange={e=>setDays(e.target.value)} className="border p-3 rounded-lg bg-white outline-none"> 
+                                <option value="1">1天</option> 
+                                <option value="3">3天</option> 
+                                <option value="7">7天</option> 
+                                <option value="30">30天</option> 
+                                <option value="60">2个月</option> 
+                                <option value="90">3个月</option> 
+                                <option value="180">半年</option> 
+                                <option value="365">1年</option> 
+                            </select> 
+                        </div> 
+                        <button onClick={handleCreate} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md btn-press">创建用户账号</button> 
+                    </div> 
+                    <div className="flex-1 overflow-y-auto"> 
+                        <h3 className="font-bold mb-3 text-gray-700 px-1">已存在的用户列表</h3> 
+                        {codes.map(c => ( 
+                            <div key={c.id} className="flex justify-between items-center p-4 border-b bg-white hover:bg-gray-50 transition-colors"> 
+                                <div> 
+                                    <div className="font-bold text-lg text-gray-800">{c.id}</div> 
+                                    <div className="text-xs text-gray-400 mt-1">有效期至: {new Date(c.expiresAt).toLocaleDateString()}</div> 
+                                </div> 
+                                <button onClick={()=>handleDelete(c.id)} className="text-red-500 bg-red-50 p-2 rounded-lg btn-press"><Icon name="Trash2" className="w-5 h-5"/></button> 
+                            </div> 
+                        ))} 
+                    </div> 
+                </div> 
+            ); 
+        };
         const LoginScreen = ({ onLogin, onAdmin }) => { 
             const [code, setCode] = useState(''); 
             const [loading, setLoading] = useState(false); 
