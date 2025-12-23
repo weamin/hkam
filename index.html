@@ -176,6 +176,11 @@
             const k = {};
             const odds=ALL_NUMBERS.filter(isOdd), evens=ALL_NUMBERS.filter(isEven);
             k['单数']=odds; k['单']=odds; k['双数']=evens; k['双']=evens;
+            
+            // --- 新增：大小数规则 ---
+            k['小数']=ALL_NUMBERS.filter(isSmall); k['小']=ALL_NUMBERS.filter(isSmall);
+            k['大数']=ALL_NUMBERS.filter(isBig); k['大']=ALL_NUMBERS.filter(isBig);
+            
             k['小单']=ALL_NUMBERS.filter(n=>isSmall(n)&&isOdd(n)); k['小双']=ALL_NUMBERS.filter(n=>isSmall(n)&&isEven(n));
             k['大单']=ALL_NUMBERS.filter(n=>isBig(n)&&isOdd(n)); k['大双']=ALL_NUMBERS.filter(n=>isBig(n)&&isEven(n));
             k['合数单']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2!==0); k['合单']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2!==0);
@@ -198,18 +203,49 @@
         const REGEX_CLIENT_TOTAL = /(?:[，,。;；]\s*)?(?:[（(]\s*)?(?:合计|总计|一共|打包)\s*[:：]?\s*\d+(?:\.\d+)?(?:\s*[元])?(?:\s*[)）])?/gi;
 
         const parseChineseNumber = (s) => { const map={'零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000}; if(s.length===1 && map[s]!==undefined && map[s]<10) return map[s]; let res=0, curr=0; for(let i=0;i<s.length;i++){ const val=map[s[i]]; if(val>=10){ if(curr===0)curr=1; res+=curr*val; curr=0; } else if(val!==undefined) curr=val; } return (res+curr)||NaN; };
-        const smartMergeLines = (lines) => { const merged=[]; let pending=""; const hasAmount=(s)=> /((每个|每号|个号|个|各|买|x|X|号|=|每)[\s.．。…~＇']*[\d零一二三四五六七八九十百千]+)|(\d+[\s.．。…~＇']*[元米斤块])|(\d+[\s.．。…~＇']*x)/.test(s); lines.forEach(line => { const clean = line.trim(); if (!clean) return; if (REGEX_CHAT_HEADER.test(clean)) { if (pending) { merged.push(pending); pending=""; } merged.push(clean); return; } if (hasAmount(clean)) { merged.push(pending + (/^[岁尾头]/.test(clean)?"":" ") + clean); pending=""; } else if (/\d|([鼠牛虎兔龙蛇马羊猴鸡狗猪红蓝绿波单双])/.test(clean)) pending += (pending&&!/^[岁尾头]/.test(clean)?" ":"") + clean; else { if (pending) { merged.push(pending); pending=""; } merged.push(clean); } }); if (pending) merged.push(pending); return merged; };
+        
+        // 修改 smartMergeLines：增加对 "遍" 的处理，避免因 "一遍" 包含数字而错误分割行
+        const smartMergeLines = (lines) => { 
+            const merged=[]; let pending=""; 
+            const hasAmount=(s)=> {
+                // 预处理：移除 "一遍"、"各1遍" 等干扰词，避免它们被误判为金额
+                const cleanS = s.replace(/各?\s*[一1]?\s*遍/g, '');
+                return /((每个|每号|个号|个|各|买|x|X|号|=|每)[\s.．。…~＇']*[\d零一二三四五六七八九十百千]+)|(\d+[\s.．。…~＇']*[元米斤块])|(\d+[\s.．。…~＇']*x)/.test(cleanS);
+            };
+            lines.forEach(line => { 
+                const clean = line.trim(); 
+                if (!clean) return; 
+                if (REGEX_CHAT_HEADER.test(clean)) { if (pending) { merged.push(pending); pending=""; } merged.push(clean); return; } 
+                if (hasAmount(clean)) { 
+                    merged.push(pending + (/^[岁尾头]/.test(clean)?"":" ") + clean); 
+                    pending=""; 
+                } else if (/\d|([鼠牛虎兔龙蛇马羊猴鸡狗猪红蓝绿波单双大小])/.test(clean)) { // 增加 "大小" 识别
+                    pending += (pending&&!/^[岁尾头]/.test(clean)?" ":"") + clean; 
+                } else { 
+                    if (pending) { merged.push(pending); pending=""; } 
+                    merged.push(clean); 
+                } 
+            }); 
+            if (pending) merged.push(pending); 
+            return merged; 
+        };
         const getNumbersForZodiac = (z, currentYear) => { const idx=ZODIAC_LIST.indexOf(currentYear), tIdx=ZODIAC_LIST.indexOf(z); if(idx===-1||tIdx===-1) return []; const offset=(idx-tIdx+12)%12; return Array.from({length:5},(_,i)=>offset+1+i*12).filter(n=>n<=49); };
 
         const parseContentWithoutAmount = (text, defaultType, currentYearZodiac) => {
             let nums=[], count=0, type=defaultType, txt=text.toUpperCase();
             if (new RegExp(PATTERN_HK).test(text)) type='HK'; else if (new RegExp(PATTERN_MO).test(text)) type='MO';
+            
+            // --- 修复重点：增强清理逻辑 ---
+            // 1. 清理 "各一遍", "各1遍", "1遍", "一遍" 等
+            txt = txt.replace(/各?\s*[一1]?\s*遍/g, ' ');
+            // 2. 清理 "香门", "港门" (它们在 parseContentForSegments 中已用于判断类型，这里只保留数字用于解析)
             txt = txt.replace(/(香门)|(港门)/g, ' '); 
+            
             txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/(\d+)\s*[.,，;；*]+\s*(?:各)?\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
             txt = txt.replace(/(\d+)[.．。…~＇' -]*\s*到\s*[.．。…~＇' -]*(\d+)/g, (m,s,e) => { const n1=parseInt(s),n2=parseInt(e); return (n1<n2&&n2-n1<49) ? Array.from({length:n2-n1+1},(_,i)=>n1+i).join(' ') : m; });
             txt = txt.replace(new RegExp(`((?:\\d+[\\s.,，;；*\\/。．…~＇' -]+)+\\d+)[\\s.,，;；*\\/。．…~＇' -]*(?:各)?\\s*(岁|尾|头)`, 'g'), (m,n,s)=>n.split(/[^\d]+/).filter(x=>x).map(x=>x+s).join(' '));
             
-            // 新增逻辑：处理紧凑的连写尾数/头数，例如 "079尾" -> "0尾 7尾 9尾"
+            // 紧凑尾数/头数拆分
             txt = txt.replace(/(\d{2,})\s*(尾|头)/g, (m, digits, suffix) => digits.split('').map(d => d + suffix).join(' '));
 
             txt = txt.replace(new RegExp(`([${ZODIAC_LIST.join('')}])`,'g'), ' $1 ').replace(/[.,，;；\/\-*\—–−+。：:…~＇']/g, ' ').replace(/[*]/g, ' ');
@@ -223,11 +259,10 @@
                 if (KEYWORDS[t]) { KEYWORDS[t].forEach(x=>nums.push(x)); count+=KEYWORDS[t].length; return; }
                 if (ZODIAC_LIST.includes(t)) { getNumbersForZodiac(t, currentYearZodiac).forEach(x=>nums.push(x)); count+=getNumbersForZodiac(t, currentYearZodiac).length; return; }
                 
-                // 修改：岁数逻辑增加了严格校验 (1-12)
                 if (t.endsWith('岁')) { 
                     const a=parseInt(t); 
                     if(!isNaN(a)) {
-                        // 规则：岁只能是 1-12，超出范围（如 612 或 26）视为异常，提示用户核对
+                        // 岁数严格校验 (1-12)
                         if (a < 1 || a > 12) {
                             hasUnknown = true;
                         } else {
@@ -255,13 +290,16 @@
                     if (new RegExp(PATTERN_HK).test(line)) currType='HK'; else currType='MO';
                     return;
                 }
+                // ... (existing pre-processing lines)
                 let processedLine = line.replace(/([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)\s*[.,，;；\s]+\s*(?=(?:香港|香|港))/g, '$1\n');
                 processedLine = processedLine.replace(/(香港|香|港)\s*[.,，;；\s]+\s*(?=(?:[奥澳][门]?|[新老]?[澳奥]门|噢T|溴T))/g, '$1\n');
                 processedLine = processedLine.replace(/((?:每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)\s*[\d零一二三四五六七八九十百千]+(?:[\.]\d+)?[元米斤块]?)\s*[，,;；]\s*/g, '$1\n');
                 processedLine = processedLine.replace(/(\d+(\.\d+)?\s*[/]\s*\d+(\.\d+)?)\s*[，,;；]\s*/g, '$1\n');
                 let splitParts = processedLine.split(processedLine.includes('\n')?'\n':(processedLine.includes('另外')?'另外':/a^/));
+                
                 splitParts.forEach(subLine => {
                     if(!subLine.trim()) return;
+                    // ... (existing regex logic)
                     if (new RegExp(PATTERN_HK).test(subLine)) currType = 'HK'; else if (new RegExp(PATTERN_MO).test(subLine)) currType = 'MO'; else if (/奥|门/.test(subLine)) currType = 'MO';
                     const regex = /(各|买|=|每|号)/.test(subLine) ? REGEX_AMOUNT_NO_SLASH : REGEX_AMOUNT_WITH_SLASH;
                     const matches = Array.from(subLine.matchAll(regex));
@@ -277,15 +315,33 @@
                             if(content){ 
                                 const res=parseContentWithoutAmount(content, currType, currentYearZodiac); 
                                 const isDual = lineHasDual || REGEX_DUAL.test(content);
-                                if(res.totalBetCount>0 || res.hasUnknown) segments.push({ numbers:res.numbers, totalBetCount:res.totalBetCount, amount:amt, content, type:currType, isDualBet:isDual, isValid:amt>0 && res.totalBetCount>0, rawLine:content+amtTxt, isSuspicious:(res.totalBetCount>1&&!/[各xX\/元米斤块=每号个]/.test(amtTxt))||res.hasUnknown, fullLine:line }); 
+                                
+                                // --- 修复：防止尾部关键词（如香门）丢失 ---
+                                // 如果这一段已经识别为数字，但 line 整体包含 dual 关键字，且 dual 关键字在当前 content 之后，
+                                // 我们需要确保这个 segment 的 isDualBet 为 true。
+                                // (isDual 变量已经通过 lineHasDual 覆盖了大部分情况)
+                                
+                                segments.push({ numbers:res.numbers, totalBetCount:res.totalBetCount, amount:amt, content, type:currType, isDualBet:isDual, isValid:amt>0 && res.totalBetCount>0, rawLine:content+amtTxt, isSuspicious:(res.totalBetCount>1&&!/[各xX\/元米斤块=每号个]/.test(amtTxt))||res.hasUnknown, fullLine:line }); 
                             }
                             cursor=idx+amtTxt.length;
                         });
                         const trail = subLine.substring(cursor).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
                         if(trail){ 
+                            // 尾部逻辑优化：
+                            // 1. 先尝试解析尾部是否包含数字
                             const res=parseContentWithoutAmount(trail, currType, currentYearZodiac); 
                             const isDual = lineHasDual || REGEX_DUAL.test(trail);
-                            if(res.totalBetCount>0 || res.hasUnknown) segments.push({ numbers:res.numbers, totalBetCount:res.totalBetCount, amount:parseFloat(defaultAmtStr)||0, content:trail, type:currType, isDualBet:isDual, isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), rawLine:trail, isSuspicious:!parseFloat(defaultAmtStr)||res.hasUnknown, fullLine:line }); 
+                            
+                            // 2. 如果尾部没有数字，但包含重要关键词（如香门），且前一个 segment 存在，
+                            //    则把这个 trail 追加到前一个 segment 的 rawLine 中，防止丢失。
+                            if (res.totalBetCount === 0 && segments.length > 0 && REGEX_DUAL.test(trail)) {
+                                segments[segments.length - 1].rawLine += trail;
+                                // 同时如果 trail 触发了 dual，更新前一个 segment 的 dual 状态
+                                if (isDual) segments[segments.length - 1].isDualBet = true;
+                            } else if(res.totalBetCount>0 || res.hasUnknown) {
+                                // 正常尾部（有数字或异常）
+                                segments.push({ numbers:res.numbers, totalBetCount:res.totalBetCount, amount:parseFloat(defaultAmtStr)||0, content:trail, type:currType, isDualBet:isDual, isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), rawLine:trail, isSuspicious:!parseFloat(defaultAmtStr)||res.hasUnknown, fullLine:line }); 
+                            }
                         }
                     }
                 });
@@ -914,6 +970,11 @@
                             setBets([]); 
                             const emptyTransfers = { hk: {}, mo: {} };
                             setTransfers(emptyTransfers); 
+                            
+                            // --- 新增：同时清空开奖号码 ---
+                            setWinningNumberHK('');
+                            setWinningNumberMO('');
+
                             if (window.isFirebaseReady && userCode) {
                                 window.fb.updateDoc(window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode)), { 
                                     bets: [], 
