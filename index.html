@@ -192,7 +192,9 @@
         })();
 
         const PATTERN_HK = "香港|香|港"; 
-        const PATTERN_MO = "澳门|澳|门|奥|新澳门|老澳门|噢T|溴T|奥特"; 
+        // 修改：调整顺序，将较长的词（如“奥特”）放在单字之前，确保优先匹配
+        const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥"; 
+        
         const REGEX_DUAL = new RegExp("([香港][\\s.,，;；]*[澳门奥])|([澳门奥][\\s.,，;；]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(澳门香港)|(香港澳门)");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
         const BASE_AMOUNT_PARTS = [`((每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。…~＇']*\\d+(\\.\\d+)?[\\s.．。…~＇']*[${UNITS}]?)`, `(\\d+(\\.\\d+)?[\\s.．。…~＇']*[${UNITS}])`, `(\\d+(\\.\\d+)?x)`, `((每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。…~＇']*[${CH_NUM}]+[\\s.．。…~＇']*[${UNITS}]?)`, `([${CH_NUM}]+[\\s.．。…~＇']*[${UNITS}])`, `((?<=[\\d\\s])[${CH_NUM}]+(?!([岁尾头])))`, `(?<=[号])\\d+(\\.\\d+)?`].join("|");
@@ -238,7 +240,8 @@
             // 1. 清理 "各一遍", "各1遍", "1遍", "一遍" 等
             txt = txt.replace(/各?\s*[一1]?\s*遍/g, ' ');
             // 2. 清理 "香门", "港门" (它们在 parseContentForSegments 中已用于判断类型，这里只保留数字用于解析)
-            txt = txt.replace(/(香门)|(港门)/g, ' '); 
+            //    增加 "(门香)" 的清理，防止它干扰后续数字识别
+            txt = txt.replace(/(香门)|(港门)|(门香)/g, ' '); 
             
             txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/(\d+)\s*[.,，;；*]+\s*(?:各)?\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
             txt = txt.replace(/(\d+)[.．。…~＇' -]*\s*到\s*[.．。…~＇' -]*(\d+)/g, (m,s,e) => { const n1=parseInt(s),n2=parseInt(e); return (n1<n2&&n2-n1<49) ? Array.from({length:n2-n1+1},(_,i)=>n1+i).join(' ') : m; });
@@ -250,7 +253,8 @@
             txt = txt.replace(new RegExp(`([${ZODIAC_LIST.join('')}])`,'g'), ' $1 ');
             
             // --- 关键修复：在分隔符列表中加入全角点号 '．' ---
-            txt = txt.replace(/[.,，;；\/\-*\—–−+。：:…~＇'．]/g, ' ').replace(/[*]/g, ' ');
+            // 增加 "特" 字清理，防止 "奥特" 匹配了 "奥" 之后留下 "特" 字干扰
+            txt = txt.replace(/[.,，;；\/\-*\—–−+。：:…~＇'．Tt特]/g, ' ').replace(/[*]/g, ' ');
             
             const hasSuspiciousTen = /([尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])\s*十|十\s*(\d+[尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])/.test(txt);
             let hasUnknown = false;
@@ -286,17 +290,19 @@
             if (!content) return [];
             const segments=[], lines = smartMergeLines(content.split(/[\n]/).filter(l=>l.trim()));
             let currType = (new RegExp(PATTERN_HK).test(content) && !new RegExp(PATTERN_MO).test(content)) ? 'HK' : 'MO';
+            // 修复：引入双边模式状态，初始为 false
+            let currIsDual = false; 
+
             lines.forEach(line => {
                 if (REGEX_CHAT_HEADER.test(line)) return;
                 
-                // --- 修改：移除整行维度的 Dual 判断，避免跨分隔符的误判 ---
-                // const lineHasDual = REGEX_DUAL.test(line); 
-                const lineHasDual = false; // 禁用整行判断，强制下沉到 segment 级别判断
-
+                // 预检：如果行首明确指定类型，重置双边状态
                 if (new RegExp(`^(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?$`).test(line.trim())) {
-                    if (new RegExp(PATTERN_HK).test(line)) currType='HK'; else currType='MO';
+                    if (new RegExp(PATTERN_HK).test(line)) { currType='HK'; currIsDual=false; }
+                    else { currType='MO'; currIsDual=false; }
                     return;
                 }
+
                 let processedLine = line.replace(/([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)\s*[.,，;；\s]+\s*(?=(?:香港|香|港))/g, '$1\n');
                 processedLine = processedLine.replace(/(香港|香|港)\s*[.,，;；\s]+\s*(?=(?:[奥澳][门]?|[新老]?[澳奥]门|噢T|溴T))/g, '$1\n');
                 processedLine = processedLine.replace(/((?:每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)\s*[\d零一二三四五六七八九十百千]+(?:[\.]\d+)?[元米斤块]?)\s*[，,;；]\s*/g, '$1\n');
@@ -306,47 +312,95 @@
                 splitParts.forEach(subLine => {
                     if(!subLine.trim()) return;
                     
-                    if (new RegExp(PATTERN_HK).test(subLine)) currType = 'HK'; else if (new RegExp(PATTERN_MO).test(subLine)) currType = 'MO'; else if (/奥|门/.test(subLine)) currType = 'MO';
                     const regex = /(各|买|=|每|号)/.test(subLine) ? REGEX_AMOUNT_NO_SLASH : REGEX_AMOUNT_WITH_SLASH;
                     const matches = Array.from(subLine.matchAll(regex));
                     
-                    // --- 新增：Segment 级别的 Dual 判断 ---
-                    const subLineHasDual = REGEX_DUAL.test(subLine);
-
                     if (matches.length === 0) {
+                        // 1. 检查 subLine 是否包含上下文切换关键词
+                        if (REGEX_DUAL.test(subLine)) { currIsDual = true; }
+                        else if (new RegExp(PATTERN_HK).test(subLine)) { currType = 'HK'; currIsDual = false; }
+                        else if (new RegExp(PATTERN_MO).test(subLine)) { currType = 'MO'; currIsDual = false; }
+
                         const res = parseContentWithoutAmount(subLine, currType, currentYearZodiac);
-                        // 使用当前片段的判断结果
-                        const isDual = subLineHasDual; 
-                        if (res.totalBetCount > 0 || res.hasUnknown || subLine.trim()) segments.push({ numbers:res.numbers, totalBetCount:res.totalBetCount, amount:parseFloat(defaultAmtStr)||0, content:subLine, type:currType, isDualBet:isDual, isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), rawLine:subLine, isSuspicious:(res.totalBetCount>1&&!parseFloat(defaultAmtStr)&&!/[元米斤块]/.test(subLine))||res.hasUnknown, fullLine:line });
+                        
+                        if (res.totalBetCount > 0 || res.hasUnknown || subLine.trim()) {
+                            segments.push({ 
+                                numbers:res.numbers, 
+                                totalBetCount:res.totalBetCount, 
+                                amount:parseFloat(defaultAmtStr)||0, 
+                                content:subLine, 
+                                type:currType, 
+                                isDualBet: currIsDual, // 使用状态变量
+                                isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), 
+                                rawLine:subLine, 
+                                isSuspicious:(res.totalBetCount>1&&!parseFloat(defaultAmtStr)&&!/[元米斤块]/.test(subLine))||res.hasUnknown, 
+                                fullLine:line 
+                            });
+                        }
                     } else {
                         let cursor=0;
                         matches.forEach(m => {
                             const amtTxt=m[0], idx=m.index, content=subLine.substring(cursor, idx).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
                             let amt=0, numM=amtTxt.match(/(\d+(\.\d+)?)/); if(numM) amt=parseFloat(numM[0]); else { const chM=amtTxt.match(new RegExp(`[${CH_NUM}]+`)); if(chM) amt=parseChineseNumber(chM[0]); }
+                            
                             if(content){ 
+                                // 2. 检查 content 是否包含上下文切换关键词
+                                if (REGEX_DUAL.test(content)) { currIsDual = true; }
+                                else if (new RegExp(PATTERN_HK).test(content)) { currType = 'HK'; currIsDual = false; }
+                                else if (new RegExp(PATTERN_MO).test(content)) { currType = 'MO'; currIsDual = false; }
+
                                 const res=parseContentWithoutAmount(content, currType, currentYearZodiac); 
-                                // 使用 subLine 级别的判断
-                                const isDual = subLineHasDual || REGEX_DUAL.test(content);
                                 
-                                segments.push({ numbers:res.numbers, totalBetCount:res.totalBetCount, amount:amt, content, type:currType, isDualBet:isDual, isValid:amt>0 && res.totalBetCount>0, rawLine:content+amtTxt, isSuspicious:(res.totalBetCount>1&&!/[各xX\/元米斤块=每号个]/.test(amtTxt))||res.hasUnknown, fullLine:line }); 
+                                segments.push({ 
+                                    numbers:res.numbers, 
+                                    totalBetCount:res.totalBetCount, 
+                                    amount:amt, 
+                                    content, 
+                                    type:currType, 
+                                    isDualBet: currIsDual, // 使用状态变量
+                                    isValid:amt>0 && res.totalBetCount>0, 
+                                    rawLine:content+amtTxt, 
+                                    isSuspicious:(res.totalBetCount>1&&!/[各xX\/元米斤块=每号个]/.test(amtTxt))||res.hasUnknown, 
+                                    fullLine:line 
+                                }); 
                             }
                             cursor=idx+amtTxt.length;
                         });
                         const trail = subLine.substring(cursor).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
                         if(trail){ 
-                            // 尾部逻辑优化：
+                            // 3. 检查 trail 是否包含上下文切换关键词，影响后续
+                            if (REGEX_DUAL.test(trail)) { currIsDual = true; }
+                            else if (new RegExp(PATTERN_HK).test(trail)) { currType = 'HK'; currIsDual = false; }
+                            else if (new RegExp(PATTERN_MO).test(trail)) { currType = 'MO'; currIsDual = false; }
+
                             const res=parseContentWithoutAmount(trail, currType, currentYearZodiac); 
-                            const isDual = subLineHasDual || REGEX_DUAL.test(trail);
                             
-                            // 2. 如果尾部没有数字，但包含重要关键词（如香门），且前一个 segment 存在，
-                            //    则把这个 trail 追加到前一个 segment 的 rawLine 中，防止丢失。
+                            // 特殊处理：如果 trail 仅仅是关键词（如“香门”），没有数字，追加到前一个 segment 的显示中，
+                            // 并且因为我们在上面已经更新了 currIsDual，所以前一个 segment 的状态也应该被修正？
+                            // 修正：如果 trail 触发了 Dual，且前一个 segment 刚刚被 push，
+                            // 那么前一个 segment 实际上是这个 trail 指令的对象。
+                            // 例如 "各10元香门"，"香门" 在 trail 里，"各10元" 的 content 在前面。
+                            
                             if (res.totalBetCount === 0 && segments.length > 0 && REGEX_DUAL.test(trail)) {
                                 segments[segments.length - 1].rawLine += trail;
-                                // 同时如果 trail 触发了 dual，更新前一个 segment 的 dual 状态
-                                if (isDual) segments[segments.length - 1].isDualBet = true;
+                                segments[segments.length - 1].isDualBet = true; // 修正前一个
+                            } else if (res.totalBetCount === 0 && segments.length > 0 && (new RegExp(PATTERN_HK).test(trail) || new RegExp(PATTERN_MO).test(trail))) {
+                                segments[segments.length - 1].rawLine += trail;
+                                segments[segments.length - 1].type = currType; // 修正前一个类型
+                                segments[segments.length - 1].isDualBet = false;
                             } else if(res.totalBetCount>0 || res.hasUnknown) {
-                                // 正常尾部（有数字或异常）
-                                segments.push({ numbers:res.numbers, totalBetCount:res.totalBetCount, amount:parseFloat(defaultAmtStr)||0, content:trail, type:currType, isDualBet:isDual, isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), rawLine:trail, isSuspicious:!parseFloat(defaultAmtStr)||res.hasUnknown, fullLine:line }); 
+                                segments.push({ 
+                                    numbers:res.numbers, 
+                                    totalBetCount:res.totalBetCount, 
+                                    amount:parseFloat(defaultAmtStr)||0, 
+                                    content:trail, 
+                                    type:currType, 
+                                    isDualBet: currIsDual, 
+                                    isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), 
+                                    rawLine:trail, 
+                                    isSuspicious:!parseFloat(defaultAmtStr)||res.hasUnknown, 
+                                    fullLine:line 
+                                }); 
                             }
                         }
                     }
