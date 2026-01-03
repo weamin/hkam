@@ -179,6 +179,10 @@
             // 新增：大小数规则
             k['小数']=ALL_NUMBERS.filter(isSmall); k['小']=ALL_NUMBERS.filter(isSmall);
             k['大数']=ALL_NUMBERS.filter(isBig); k['大']=ALL_NUMBERS.filter(isBig);
+
+            // 新增：大小尾规则
+            k['大尾']=ALL_NUMBERS.filter(n=>[5,6,7,8,9].includes(n%10));
+            k['小尾']=ALL_NUMBERS.filter(n=>[0,1,2,3,4].includes(n%10));
             
             k['小单']=ALL_NUMBERS.filter(n=>isSmall(n)&&isOdd(n)); k['小双']=ALL_NUMBERS.filter(n=>isSmall(n)&&isEven(n));
             k['大单']=ALL_NUMBERS.filter(n=>isBig(n)&&isOdd(n)); k['大双']=ALL_NUMBERS.filter(n=>isBig(n)&&isEven(n));
@@ -206,7 +210,7 @@
 
         const parseChineseNumber = (s) => { const map={'零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000}; if(s.length===1 && map[s]!==undefined && map[s]<10) return map[s]; let res=0, curr=0; for(let i=0;i<s.length;i++){ const val=map[s[i]]; if(val>=10){ if(curr===0)curr=1; res+=curr*val; curr=0; } else if(val!==undefined) curr=val; } return (res+curr)||NaN; };
         
-        // 修改 smartMergeLines：增加对 "遍" 的处理，增加顿号支持
+        // 修改 smartMergeLines：增加对 "遍" 的处理，增加顿号支持，增加 "尾" 字支持以便识别 "大尾"
         const smartMergeLines = (lines) => { 
             const merged=[]; let pending=""; 
             const hasAmount=(s)=> {
@@ -222,7 +226,7 @@
                 if (hasAmount(clean)) { 
                     merged.push(pending + (/^[岁尾头]/.test(clean)?"":" ") + clean); 
                     pending=""; 
-                } else if (/\d|([鼠牛虎兔龙蛇马羊猴鸡狗猪红蓝绿波单双大小])/.test(clean)) { // 增加 "大小" 识别
+                } else if (/\d|([鼠牛虎兔龙蛇马羊猴鸡狗猪红蓝绿波单双大小尾])/.test(clean)) { // 增加 "尾" 识别
                     pending += (pending&&!/^[岁尾头]/.test(clean)?" ":"") + clean; 
                 } else { 
                     if (pending) { merged.push(pending); pending=""; } 
