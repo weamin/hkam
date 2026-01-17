@@ -77,13 +77,13 @@
                         await signInAnonymously(auth);
                     }
                     window.db = db;
-                    window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc };
+                    window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc, updateDoc };
                     window.isFirebaseReady = true;
                     console.log("System Online (Auth Success)");
                 } catch (err) {
                     console.warn("Auth/Network Error - Entering Offline Mode", err);
                     window.db = db;
-                    window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc };
+                    window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc, updateDoc };
                     window.isFirebaseReady = true; 
                 }
             };
@@ -103,10 +103,7 @@
         #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; max-width: 28rem; margin: 0 auto; background: white; }
         .btn-press:active { transform: scale(0.96); opacity: 0.8; }
         
-        /* 修复：排除 ID 为 preview-text 的 textarea，使其可以动态调整字号 */
         input, select, textarea:not(#preview-text) { font-size: 16px !important; user-select: text !important; } 
-        
-        /* 预览框样式：允许字号调整 */
         #preview-text { font-size: inherit; }
 
         .compact-table th, .compact-table td { padding: 4px 2px; }
@@ -139,7 +136,7 @@
             }
         }
 
-        const ICON_PATHS={Calculator:"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2",Settings:"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z",Zap:"M13 2L3 14h9l-1 8 10-12h-9l1-8z",Trash2:"M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",Send:"M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z",Eraser:"m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21M22 21H7M5 11l9 9",ClipboardCheck:"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2 M9 14l2 2 4-4",Scale:"m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z m-14 0 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z M7 21h10 M12 3v18 M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2",FileText:"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",Eye:"M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6",Check:"M20 6L9 17l-5-5",X:"M18 6L6 18M6 6l12 12",AlertTriangle:"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z M12 9v4 M12 17h.01",ChevronDown:"m6 9 6 6 6-6",BookOpen:"M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z",ShieldAlert:"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10 M12 8v4 M12 16h.01",User:"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2",Copy:"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2 M8 8h14v14H8z",Filter:"M22 3H2l8 9.46V19l4 2v-8.54L22 3z",RefreshCw:"M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15",Lock:"M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm5-9V7a5 5 0 0 0-10 0v1h-1v10h12V8h-1zm-6-1a4 4 0 1 1 8 0v1H11V7z",LogOut:"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",UserPlus:"M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M16 11l2 2 4-4 M23 6v5h-5",PlusCircle:"M12 8v4m0 0v4m0-4h4m-4 0H8m4-6a6 6 0 1 1 0 12a6 6 0 0 1 0-12z",ArrowRightCircle:"M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-1 15l-1.4-1.4 3.6-3.6-3.6-3.6L11 7l5 5z",Share:"M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13",CornerUpRight:"M4 10h4a4 4 0 0 1 4 4v6m4-10l-4-4-4 4"};
+        const ICON_PATHS={Calculator:"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2",Settings:"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z",Zap:"M13 2L3 14h9l-1 8 10-12h-9l1-8z",Trash2:"M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",Send:"M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z",Eraser:"m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21M22 21H7M5 11l9 9",ClipboardCheck:"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2 M9 14l2 2 4-4",Scale:"m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z m-14 0 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z M7 21h10 M12 3v18 M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2",FileText:"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",Eye:"M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6",Check:"M20 6L9 17l-5-5",X:"M18 6L6 18M6 6l12 12",AlertTriangle:"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z M12 9v4 M12 17h.01",ChevronDown:"m6 9 6 6 6-6",BookOpen:"M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z",ShieldAlert:"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10 M12 8v4 M12 16h.01",User:"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2",Copy:"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2 M8 8h14v14H8z",Filter:"M22 3H2l8 9.46V19l4 2v-8.54L22 3z",RefreshCw:"M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15",Lock:"M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm5-9V7a5 5 0 0 0-10 0v1h-1v10h12V8h-1zm-6-1a4 4 0 1 1 8 0v1H11V7z",LogOut:"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",UserPlus:"M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M16 11l2 2 4-4 M23 6v5h-5",PlusCircle:"M12 8v4m0 0v4m0-4h4m-4 0H8m4-6a6 6 0 1 1 0 12a6 6 0 0 1 0-12z",ArrowRightCircle:"M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-1 15l-1.4-1.4 3.6-3.6-3.6-3.6L11 7l5 5z",Share:"M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13",CornerUpRight:"M4 10h4a4 4 0 0 1 4 4v6m4-10l-4-4-4 4",CloudOff:"M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-14.33 3.52M2 2l20 20",Cloud:"M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z",Calendar:"M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V8h14v12zM16 2v4M8 2v4"};
         const Icon = ({ name, className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{ICON_PATHS[name]&&<path d={ICON_PATHS[name]}/>}{!ICON_PATHS[name]&&<circle cx="12" cy="12" r="10" />}</svg>;
 
         const ZODIAC_LIST = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
@@ -170,7 +167,6 @@
 
         const PATTERN_HK = "香港|香|港"; 
         const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥"; 
-        
         const REGEX_DUAL = new RegExp("([香港][\\s.,，;；]*[澳门奥])|([澳门奥][\\s.,，;；]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(澳门香港)|(香港澳门)");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
         const BASE_AMOUNT_PARTS = [`((每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。、…~＇']*\\d+(\\.\\d+)?[\\s.．。、…~＇']*[${UNITS}]?)`, `(\\d+(\\.\\d+)?[\\s.．。、…~＇']*[${UNITS}])`, `(\\d+(\\.\\d+)?x)`, `((每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。、…~＇']*[${CH_NUM}]+[\\s.．。、…~＇']*[${UNITS}]?)`, `([${CH_NUM}]+[\\s.．。、…~＇']*[${UNITS}])`, `((?<=[\\d\\s])[${CH_NUM}]+(?!([岁尾头])))`, `(?<=[号])\\d+(\\.\\d+)?`].join("|");
@@ -215,7 +211,17 @@
             
             txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/(\d+)\s*[.,，;；*]+\s*(?:各)?\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
             txt = txt.replace(/(\d+)[.．。…~＇' -]*\s*到\s*[.．。…~＇' -]*(\d+)/g, (m,s,e) => { const n1=parseInt(s),n2=parseInt(e); return (n1<n2&&n2-n1<49) ? Array.from({length:n2-n1+1},(_,i)=>n1+i).join(' ') : m; });
-            txt = txt.replace(new RegExp(`((?:\\d+[\\s.,，;；、*\\/。．…~＇' -]+)+\\d+)[\\s.,，;；、*\\/。．…~＇' -]*(?:各)?\\s*(岁|尾|头)`, 'g'), (m,n,s)=>n.split(/[^\d]+/).filter(x=>x).map(x=>x+s).join(' '));
+            // 修复1: 增加对数字串+岁/尾/头的细粒度范围检查，防止误判
+            txt = txt.replace(new RegExp(`((?:\\d+[\\s.,，;；、*\\/。．…~＇' -]+)+\\d+)[\\s.,，;；、*\\/。．…~＇' -]*(?:各)?\\s*(岁|尾|头)`, 'g'), (m,n,s)=> {
+                return n.split(/[^\d]+/).filter(x=>x).map(x=>{
+                    const val = parseInt(x);
+                    if(isNaN(val)) return x;
+                    if(s==='岁' && val>=1 && val<=12) return x+s;
+                    if(s==='尾' && val>=0 && val<=9) return x+s;
+                    if(s==='头' && val>=0 && val<=4) return x+s;
+                    return x;
+                }).join(' ');
+            });
             
             txt = txt.replace(/(\d{2,})\s*(尾|头)/g, (m, digits, suffix) => digits.split('').map(d => d + suffix).join(' '));
 
@@ -494,7 +500,6 @@
         };
         const RawRecordModal = ({ batch, onClose }) => ( <ModalContainer> <div className="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl"> <h3 className="font-bold text-lg mb-4 border-b pb-2">原始下单记录</h3> <div className="bg-slate-100 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto text-slate-700"> <div className="font-bold mb-2 text-slate-900">{batch.header}</div> {batch.originalTotal && <div className="text-orange-600 font-bold mb-2">手写总计: {batch.originalTotal}</div>} <pre className="whitespace-pre-wrap break-all">{batch.fullText || batch.lines.join('\n')}</pre> </div> <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow btn-press">关闭</button> </div> </ModalContainer> );
         
-        // --- 修改 HedgingModal：接收 lastHedgingText 和 setLastHedgingText ---
         const HedgingModal = ({ onClose, riskStats, riskFilter, customers, bets, showAlert, transfers, onSaveTransfers, lastHedgingText, setLastHedgingText }) => { 
             const [activeType, setActiveType] = useState(riskFilter==='HK'?'HK':'MO'); 
             const [hedgingTarget, setHedgingTarget] = useState('ALL'); 
@@ -558,7 +563,7 @@
                 if (toTransfer.length === 0) { showAlert("没有需要转出的注单", "warning"); return; } 
                 
                 const lines = toTransfer.map(d => `${d.num}=${d.advice}`); 
-                const textToCopy = lines.join(' '); // 生成文本
+                const textToCopy = lines.join(' '); 
 
                 const el = document.createElement('textarea'); 
                 el.value = textToCopy; 
@@ -567,7 +572,6 @@
                 document.execCommand('copy'); 
                 document.body.removeChild(el); 
                 
-                // 保存到历史记录状态
                 setLastHedgingText(textToCopy);
 
                 const newTransfers = { ...transfers }; 
@@ -578,7 +582,6 @@
                 setTimeout(()=>setCopyMsg(''), 2000); 
             }; 
             
-            // --- 新增：重新复制功能 ---
             const handleReCopy = () => {
                 if (!lastHedgingText) return;
                 const el = document.createElement('textarea');
@@ -611,7 +614,6 @@
                         </div> 
                         <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding flex gap-2">
                             <button onClick={onClose} className="w-16 bg-slate-100 border rounded-xl font-bold btn-press text-slate-500">关闭</button>
-                            {/* 再次复制按钮 */}
                             {lastHedgingText && (
                                 <button onClick={handleReCopy} className="w-16 bg-orange-100 text-orange-600 border border-orange-200 rounded-xl font-bold btn-press flex items-center justify-center shadow-sm active:scale-95" title="再次复制上次内容">
                                     <Icon name="RefreshCw" className="w-5 h-5"/>
@@ -628,11 +630,21 @@
             const [code, setCode] = useState(''); 
             const [days, setDays] = useState(30); 
             const [codes, setCodes] = useState([]); 
-            
+            // 2. 延期功能状态
+            const [renewTarget, setRenewTarget] = useState(null); 
+            const [renewDays, setRenewDays] = useState(30);
+
             const fetchCodes = async () => { 
-                if(!db || !window.fb) return; 
+                if(!window.fb) return; 
                 try { 
-                    const snap = await window.fb.getDocs(window.fb.collection(db, ...window.DB_PATH.getCollectionArgs("access_codes"))); 
+                    // 适配本地或云端
+                    let colRef;
+                    if (window.isLocalMode) {
+                        colRef = window.fb.collection("LOCAL", "access_codes");
+                    } else {
+                        colRef = window.fb.collection(db, ...window.DB_PATH.getCollectionArgs("access_codes"));
+                    }
+                    const snap = await window.fb.getDocs(colRef); 
                     setCodes(snap.docs.map(d => ({id: d.id, ...d.data()}))); 
                 } catch(e) { alert("获取数据失败: " + e.message); } 
             }; 
@@ -641,18 +653,53 @@
             
             const handleCreate = async () => { 
                 if(!code) return; 
-                if(!db || !window.fb) { alert("数据库未连接"); return; } 
                 const expiry = new Date(); 
                 expiry.setDate(expiry.getDate() + parseInt(days)); 
-                await window.fb.setDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", code)), { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} } }); 
+                
+                let docRef;
+                if (window.isLocalMode) {
+                    docRef = window.fb.doc("LOCAL", "access_codes", code);
+                } else {
+                    docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", code));
+                }
+                
+                await window.fb.setDoc(docRef, { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} } }); 
                 alert("访问码 " + code + " 创建成功！"); 
                 fetchCodes(); 
                 setCode(''); 
             }; 
+
+            // 2. 延期处理函数
+            const handleRenew = async () => {
+                if (!renewTarget) return;
+                const now = Date.now();
+                // 逻辑：如果未过期，则在原基础上加；如果已过期，则从当前时间开始加
+                const baseTime = renewTarget.expiresAt > now ? renewTarget.expiresAt : now;
+                const newExpiry = baseTime + parseInt(renewDays) * 24 * 60 * 60 * 1000;
+                
+                let docRef;
+                if (window.isLocalMode) {
+                    docRef = window.fb.doc("LOCAL", "access_codes", renewTarget.id);
+                } else {
+                    docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", renewTarget.id));
+                }
+
+                await window.fb.updateDoc(docRef, { expiresAt: newExpiry });
+                
+                alert(`用户 ${renewTarget.id} 已成功延期！`);
+                setRenewTarget(null);
+                fetchCodes();
+            };
             
             const handleDelete = async (id) => { 
                 if(confirm("确定删除 " + id + " 吗？此操作不可恢复！")) { 
-                    await window.fb.deleteDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id))); 
+                    let docRef;
+                    if (window.isLocalMode) {
+                        docRef = window.fb.doc("LOCAL", "access_codes", id);
+                    } else {
+                        docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id));
+                    }
+                    await window.fb.deleteDoc(docRef); 
                     fetchCodes(); 
                 } 
             }; 
@@ -660,9 +707,11 @@
             return ( 
                 <div className="fixed inset-0 bg-white z-[5000] p-4 flex flex-col animate-fade-in"> 
                     <div className="flex justify-between items-center mb-4 border-b pb-2"> 
-                        <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="Lock" className="w-6 h-6"/> 管理员控制台</h2> 
+                        <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="Lock" className="w-6 h-6"/> 管理员控制台 {window.isLocalMode && <span className="text-xs bg-orange-100 text-orange-600 px-2 rounded">本地模式</span>}</h2> 
                         <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6"/></button> 
                     </div> 
+                    
+                    {/* 创建新用户 */}
                     <div className="mb-6 p-4 bg-indigo-50 rounded-xl space-y-4 shadow-sm border border-indigo-100"> 
                         <h3 className="font-bold text-indigo-900 flex items-center gap-2"><Icon name="UserPlus" className="w-5 h-5"/> 生成新访问码</h3> 
                         <div className="flex gap-2"> 
@@ -680,18 +729,59 @@
                         </div> 
                         <button onClick={handleCreate} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md btn-press">创建用户账号</button> 
                     </div> 
+
+                    {/* 用户列表 */}
                     <div className="flex-1 overflow-y-auto"> 
                         <h3 className="font-bold mb-3 text-gray-700 px-1">已存在的用户列表</h3> 
-                        {codes.map(c => ( 
-                            <div key={c.id} className="flex justify-between items-center p-4 border-b bg-white hover:bg-gray-50 transition-colors"> 
-                                <div> 
-                                    <div className="font-bold text-lg text-gray-800">{c.id}</div> 
-                                    <div className="text-xs text-gray-400 mt-1">有效期至: {new Date(c.expiresAt).toLocaleDateString()}</div> 
+                        {codes.map(c => {
+                            const isExpired = Date.now() > c.expiresAt;
+                            return (
+                                <div key={c.id} className="flex justify-between items-center p-4 border-b bg-white hover:bg-gray-50 transition-colors"> 
+                                    <div> 
+                                        <div className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                                            {c.id}
+                                            {isExpired && <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded">已过期</span>}
+                                        </div> 
+                                        <div className="text-xs text-gray-400 mt-1">有效期至: {new Date(c.expiresAt).toLocaleDateString()}</div> 
+                                    </div> 
+                                    <div className="flex gap-2">
+                                        {/* 2. 延期按钮 */}
+                                        <button onClick={()=>setRenewTarget(c)} className="text-blue-600 bg-blue-50 px-3 py-2 rounded-lg font-bold text-xs btn-press flex items-center gap-1">
+                                            <Icon name="Calendar" className="w-4 h-4"/> 延期
+                                        </button>
+                                        <button onClick={()=>handleDelete(c.id)} className="text-red-500 bg-red-50 p-2 rounded-lg btn-press"><Icon name="Trash2" className="w-5 h-5"/></button> 
+                                    </div>
                                 </div> 
-                                <button onClick={()=>handleDelete(c.id)} className="text-red-500 bg-red-50 p-2 rounded-lg btn-press"><Icon name="Trash2" className="w-5 h-5"/></button> 
-                            </div> 
-                        ))} 
-                    </div> 
+                            );
+                        })} 
+                    </div>
+
+                    {/* 2. 延期弹窗 */}
+                    {renewTarget && (
+                        <div className="fixed inset-0 bg-black/50 z-[6000] flex items-center justify-center p-4 animate-fade-in">
+                            <div className="bg-white w-full max-w-sm rounded-xl p-5 shadow-2xl">
+                                <h3 className="font-bold text-lg mb-4 text-slate-800">为用户 {renewTarget.id} 延期</h3>
+                                <p className="text-xs text-slate-500 mb-4">当前有效期至: {new Date(renewTarget.expiresAt).toLocaleDateString()}</p>
+                                <div className="space-y-2 mb-6">
+                                    <div className="text-sm font-bold text-slate-600">选择延长时间:</div>
+                                    <select value={renewDays} onChange={e=>setRenewDays(e.target.value)} className="w-full border p-3 rounded-lg bg-slate-50 outline-none">
+                                        <option value="1">1天</option>
+                                        <option value="3">3天</option>
+                                        <option value="7">7天</option>
+                                        <option value="30">30天</option>
+                                        <option value="60">2个月</option>
+                                        <option value="90">3个月</option>
+                                        <option value="180">半年</option>
+                                        <option value="365">1年</option>
+                                    </select>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={()=>setRenewTarget(null)} className="flex-1 py-3 border rounded-lg text-slate-500 font-bold btn-press">取消</button>
+                                    <button onClick={handleRenew} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg btn-press">确认延期</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div> 
             ); 
         };
@@ -701,7 +791,20 @@
             
             const handleLogin = async () => { 
                 if(!code) return; 
-                // Ensure Firebase is ready even for admin
+                if (window.isLocalMode) {
+                   if(code === 'admin888') { onAdmin(); return; }
+                   setLoading(true);
+                   try {
+                       const docRef = window.fb.doc("LOCAL", "access_codes", code);
+                       const docSnap = await window.fb.getDoc(docRef);
+                       if (docSnap.exists()) {
+                           const data = docSnap.data();
+                           if (Date.now() > data.expiresAt) { alert("此访问码已过期，请联系管理员续费。"); } else { onLogin(code, data); }
+                       } else { alert("访问码不存在（本地）！"); }
+                   } catch(e) { console.error(e); alert("本地存储错误"); }
+                   setLoading(false);
+                   return;
+                }
                 if (!window.isFirebaseReady) { 
                     alert("正在连接云端数据库，请稍等 2-3 秒后重试..."); 
                     return; 
@@ -719,16 +822,30 @@
                 } catch(e) { console.error(e); alert("登录出错: " + e.message); } 
                 setLoading(false); 
             }; 
-            return ( <div className="min-h-screen login-bg flex items-center justify-center p-4"> <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in"> <div className="text-center"> <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner"> <Icon name="Zap" className="w-8 h-8"/> </div> <h1 className="text-2xl font-bold text-gray-800">系统登录</h1> <p className="text-gray-400 text-sm mt-2">请输入管理员提供的访问码</p> </div> <div className="space-y-4"> <input type="text" value={code} onChange={e=>setCode(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none py-4 tracking-widest bg-gray-50 focus:bg-white transition-all text-indigo-900" placeholder="输入访问码" /> <button onClick={handleLogin} disabled={loading} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all btn-press disabled:opacity-50 disabled:cursor-not-allowed"> {loading ? "正在验证..." : "进入系统"} </button> </div> <div className="text-center text-xs text-gray-300 pt-4">v7.16 (终极修复版)</div> </div> </div> ); };
+            return ( <div className="min-h-screen login-bg flex items-center justify-center p-4"> <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in relative overflow-hidden"> 
+                <div className={`absolute top-0 left-0 w-full h-1 ${window.isLocalMode ? 'bg-orange-400' : 'bg-green-500'}`}></div>
+                <div className="absolute top-2 right-2 text-[10px] text-gray-400 font-mono">
+                    {window.isLocalMode ? 'LOCAL MODE' : 'CLOUD MODE'}
+                </div>
+                <div className="text-center"> <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner"> <Icon name="Zap" className="w-8 h-8"/> </div> <h1 className="text-2xl font-bold text-gray-800">系统登录</h1> <p className="text-gray-400 text-sm mt-2">请输入管理员提供的访问码</p> </div> 
+                <div className="space-y-4"> <input type="text" value={code} onChange={e=>setCode(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none py-4 tracking-widest bg-gray-50 focus:bg-white transition-all text-indigo-900" placeholder="输入访问码" /> <button onClick={handleLogin} disabled={loading} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all btn-press disabled:opacity-50 disabled:cursor-not-allowed"> {loading ? "正在验证..." : "进入系统"} </button> </div> 
+                <div className="text-center space-y-2">
+                    <div className="text-xs text-gray-300">v7.16 (终极修复版)</div>
+                    {!window.isLocalMode && ( <button onClick={window.forceLocalMode} className="text-[10px] text-orange-400 underline opacity-70 hover:opacity-100">连接失败？切换到本地离线模式</button> )}
+                    {window.isLocalMode && ( <button onClick={window.retryCloudConnection} className="text-[10px] text-blue-500 underline opacity-70 hover:opacity-100">重试连接云端</button> )}
+                </div>
+            </div> </div> ); 
+        };
 
         function App() {
             const [userCode, setUserCode] = useState(localStorage.getItem('lottery_user_code') || null);
             const [isAdmin, setIsAdmin] = useState(false);
             const [sessionID, setSessionID] = useState(localStorage.getItem('lottery_session_id') || null);
+            const [isLocalMode, setIsLocalMode] = useState(window.isLocalMode || false);
             
             const [bets, setBets] = useState([]);
             const [customers, setCustomers] = useState([]);
-            const [transfers, setTransfers] = useState({ hk: {}, mo: {} }); // v7.08: Transfer state
+            const [transfers, setTransfers] = useState({ hk: {}, mo: {} });
             const [currentYearZodiac, setCurrentYearZodiac] = useState('蛇');
             
             const [inputCustomer, setInputCustomer] = useState(''); const [inputContent, setInputContent] = useState(''); const [defaultAmount, setDefaultAmount] = useState('');
@@ -739,25 +856,16 @@
             const [expandedReconciliation, setExpandedReconciliation] = useState(null); const [viewingRawBatch, setViewingRawBatch] = useState(null);
             const [previewBatches, setPreviewBatches] = useState([]); const [riskFilter, setRiskFilter] = useState('ALL'); const [bookMode, setBookMode] = useState('ALL'); const [bookTarget, setBookTarget] = useState('');
             const [insertOrderTarget, setInsertOrderTarget] = useState(null);
-            
-            // 新增：自动聚焦的批次ID
             const [focusBatchId, setFocusBatchId] = useState(null);
-
-            // --- 新增：记录最后一次转单内容 ---
             const [lastHedgingText, setLastHedgingText] = useState('');
-            
-            // --- 新增：预览字体大小 ---
             const [previewFontSize, setPreviewFontSize] = useState(14);
 
-            // --- 核心业务逻辑 (直接调用外置函数) ---
             useEffect(() => {
                 const txt = inputContent.trim();
                 if (!txt) { setPreviewBatches([]); return; }
                 const blocks=[]; let curHead='', curLines=[];
                 txt.split('\n').forEach(l => { const isH=/[:：]\s*$/.test(l)&&!new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})[:：]`).test(l); if(isH){if(curLines.length)blocks.push({header:curHead,text:curLines.join('\n')});curHead=l.trim();curLines=[];} else if(l.trim())curLines.push(l); });
                 if(curLines.length) blocks.push({header:curHead,text:curLines.join('\n')});
-                
-                // 直接调用外置的解析函数
                 const previews = blocks.map(b => {
                     const segments = parseContentForSegments(b.text, defaultAmount, currentYearZodiac).filter(s=>s.totalBetCount>0 || s.isSuspicious);
                     const systemTotal = segments.reduce((acc, seg) => acc + (seg.totalBetCount * (seg.isValid&&!seg.isSuspicious?seg.amount:0) * (seg.isDualBet?2:1)), 0);
@@ -767,11 +875,9 @@
                 setPreviewBatches(previews);
             }, [inputContent, defaultAmount, currentYearZodiac]);
 
-            // --- 恢复被遗漏的核心统计逻辑 ---
             const riskStats = useMemo(() => {
                 const hk=Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0})), mo=Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0}));
                 let [tpH,trH,tpM,trM]=[0,0,0,0];
-                // 风控逻辑修改：过滤掉 isTransferred 为 true 的订单
                 bets.filter(b=>!b.isError && !b.isTransferred).forEach(b => {
                     const c = customers.find(x=>x.name===b.customerName)||{odds:47.5,rebate:0.1}, reb = b.totalAmount*c.rebate;
                     if(b.type==='HK'){tpH+=b.totalAmount;trH+=reb}else{tpM+=b.totalAmount;trM+=reb}
@@ -789,7 +895,6 @@
                     grouped[b.customerName].total += b.totalAmount;
                     grouped[b.customerName].batches[b.batchId].total += b.totalAmount;
                     grouped[b.customerName].batches[b.batchId].records.push(b);
-                    // 只要有一条记录被标记为转出，整个 batch 视为转出 (通常是一起操作的)
                     if(b.isTransferred) grouped[b.customerName].batches[b.batchId].isTransferred = true;
                 });
                 return Object.entries(grouped).map(([name, d]) => ({ name, total: d.total, batches: Object.values(d.batches).sort((a,b) => a.timestamp - b.timestamp) }));
@@ -800,7 +905,6 @@
                 const [wh, wm] = [parseInt(winningNumberHK), parseInt(winningNumberMO)];
                 const stats = [];
                 customers.forEach(cust => {
-                    // 对账逻辑保持不变：即使转出（isTransferred=true）也要显示，用于和客户对账
                     const custBets = bets.filter(b => b.customerName === cust.name && !b.isError);
                     let total = 0, winHK = 0, winMO = 0;
                     const tBatch = {}, processed = new Set();
@@ -850,13 +954,10 @@
                 const txt = `【${stat.name}】对账\n----------------\n开奖: 港[${winningNumberHK||'-'}] 澳[${winningNumberMO||'-'}]\n----------------\n本期总投: ¥${stat.totalStake}\n中特本金: ¥${stat.winningStakeTotal}\n退水: ¥${stat.rebateAmt.toFixed(1)}\n----------------\n盈亏: ${stat.profit>=0?'+':''}${stat.profit.toFixed(1)}\n----------------\n${dt}`;
                 
                 // 自动计算适合一屏的字体大小
-                const lines = txt.split('\n').length + 2; 
-                // 稍微留多一点余地，比如高度减去 200px (header 60 + footer 80 + padding)
-                const availableHeight = window.innerHeight - 200; 
-                // 每行行高约为字体大小的 1.3 倍
-                let size = Math.floor(availableHeight / (lines * 1.3)); 
-                // 限制在 9px - 20px 之间
-                if (size > 20) size = 20;
+                const lines = txt.split('\n').length + 3; 
+                const availableHeight = window.innerHeight - 150; 
+                let size = Math.floor(availableHeight / (lines * 1.5)); 
+                if (size > 18) size = 18;
                 if (size < 9) size = 9; 
 
                 setPreviewFontSize(size);
@@ -1005,14 +1106,20 @@
 
             const handleSaveTransfers = (newTransfers) => {
                 setTransfers(newTransfers);
-                if (window.isFirebaseReady && userCode) {
-                    window.fb.updateDoc(window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode)), { transfers: newTransfers }).catch(console.error);
+                if (window.isFirebaseReady && userCode && !window.isLocalMode) {
+                    let docRef;
+                    if (window.isLocalMode) {
+                        docRef = window.fb.doc("LOCAL", "access_codes", userCode);
+                    } else {
+                        docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode));
+                    }
+                    window.fb.updateDoc(docRef, { transfers: newTransfers }).catch(console.error);
                 }
             };
 
             const handleLoginSuccess = async (code, initialData) => {
                 const newSid = Math.random().toString(36).substring(2) + Date.now().toString(36);
-                if (window.isFirebaseReady) {
+                if (window.isFirebaseReady && !window.isLocalMode) {
                     await window.fb.updateDoc(window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", code)), { currentSessionId: newSid });
                 }
                 localStorage.setItem('lottery_user_code', code); localStorage.setItem('lottery_session_id', newSid);
@@ -1034,7 +1141,7 @@
                 title: "数据管理", 
                 actions: [ 
                     { text: inputCustomer ? `🗑️ 清空 [${inputCustomer}]` : "请先选择客户", onClick: () => { if(inputCustomer){ setBets(p => p.filter(b => b.customerName !== inputCustomer)); showAlert(`已清空 ${inputCustomer}`, 'success'); setActionSheet(null); } } }, 
-                    { text: "⚠️ 清空所有数据", className: "bg-red-100 text-red-700", onClick: () => { setBets([]); const emptyTransfers = { hk: {}, mo: {} }; setTransfers(emptyTransfers); setWinningNumberHK(''); setWinningNumberMO(''); if (window.isFirebaseReady && userCode) { window.fb.updateDoc(window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode)), { bets: [], transfers: emptyTransfers }).catch(console.error); } showAlert('系统已重置', 'success'); setActionSheet(null); } } 
+                    { text: "⚠️ 清空所有数据", className: "bg-red-100 text-red-700", onClick: () => { setBets([]); const emptyTransfers = { hk: {}, mo: {} }; setTransfers(emptyTransfers); setWinningNumberHK(''); setWinningNumberMO(''); if (window.isFirebaseReady && userCode) { let docRef; if (window.isLocalMode) { docRef = window.fb.doc("LOCAL", "access_codes", userCode); } else { docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode)); } window.fb.updateDoc(docRef, { bets: [], transfers: emptyTransfers }).catch(console.error); } showAlert('系统已重置', 'success'); setActionSheet(null); } } 
                 ], 
                 onCancel: () => setActionSheet(null) 
             });
@@ -1044,8 +1151,24 @@
             const handleUpdateCustomerField = (id, k, v) => setTempCustomers(prev=>prev.map(c=>c.id===id?{...c,[k]:v}:c));
             const handleSaveCustomers = () => { setCustomers(tempCustomers); setShowSettings(false); };
 
-            useEffect(() => { if (!userCode || !sessionID || !window.isFirebaseReady) return; const unsub = window.fb.onSnapshot(window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode)), (doc) => { if (doc.exists()) { const data = doc.data(); if (data.currentSessionId && data.currentSessionId !== sessionID) { alert("您的账号已在其他设备登录，您已被强制下线！"); handleLogout(); } } else { alert("账号不存在！"); handleLogout(); } }); return () => unsub(); }, [userCode, sessionID]);
-            useEffect(() => { if (!userCode || !window.isFirebaseReady) return; const timer = setTimeout(() => { window.fb.updateDoc(window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode)), { bets, customers, transfers }).catch(e => console.error(e)); }, 2000); return () => clearTimeout(timer); }, [bets, customers, transfers, userCode]);
+            useEffect(() => { if (!userCode || !sessionID || !window.isFirebaseReady) return; 
+                let docRef;
+                if (window.isLocalMode) {
+                    docRef = window.fb.doc("LOCAL", "access_codes", userCode);
+                } else {
+                    docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode));
+                }
+                const unsub = window.fb.onSnapshot(docRef, (doc) => { if (doc.exists()) { const data = doc.data(); if (!window.isLocalMode && data.currentSessionId && data.currentSessionId !== sessionID) { alert("您的账号已在其他设备登录，您已被强制下线！"); handleLogout(); } } else { alert("账号不存在！"); handleLogout(); } }); return () => unsub(); }, [userCode, sessionID, isLocalMode]);
+            
+            useEffect(() => { if (!userCode || !window.isFirebaseReady) return; const timer = setTimeout(() => { 
+                let docRef;
+                if (window.isLocalMode) {
+                    docRef = window.fb.doc("LOCAL", "access_codes", userCode);
+                } else {
+                    docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode));
+                }
+                window.fb.updateDoc(docRef, { bets, customers, transfers }).catch(e => console.error(e)); }, 2000); return () => clearTimeout(timer); }, [bets, customers, transfers, userCode, isLocalMode]);
+            
             useEffect(() => { if(bets) localStorage.setItem('lottery_bets_v5', JSON.stringify(bets)) }, [bets]);
             useEffect(() => { if(currentYearZodiac) localStorage.setItem('lottery_year_zodiac', currentYearZodiac) }, [currentYearZodiac]);
             useEffect(() => { if(customers) localStorage.setItem('lottery_customers', JSON.stringify(customers)); }, [customers]);
