@@ -3,31 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>订单管理系统 v7.16 (终极稳定版)</title>
+    <title>订单管理系统 v7.16 (终极修复版)</title>
     
-    <!-- 1. 安全卫士 (已激活 - 防白嫖模式) -->
+    <!-- 1. 安全卫士 -->
     <script>
         (function() {
-            // 允许运行的域名白名单
-            const ALLOWED_DOMAINS = [
-                'localhost', 
-                '127.0.0.1', 
-                'firebaseapp.com', 
-                'web.app', 
-                'usercontent', 
-                'google', 
-                'blob:', 
-                'googleusercontent',
-                'github.io'
-            ];
-
+            const ALLOWED_DOMAINS = ['localhost', '127.0.0.1', 'firebaseapp.com', 'web.app', 'usercontent', 'google', 'blob:', 'github.io'];
             function checkDomain() {
                 if (window.location.protocol === 'blob:') return;
                 const current = window.location.hostname;
                 if (!ALLOWED_DOMAINS.some(d => current.includes(d))) {
                     console.warn("Security Alert: Unauthorized Domain " + current);
-                    document.body.innerHTML = '<div style="background:#1a1a1a;color:#ff4444;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:sans-serif;"><div style="font-size:48px;margin-bottom:20px;">⛔</div><div style="font-size:24px;font-weight:bold;">非法运行环境</div><div style="font-size:14px;color:#666;margin-top:10px;">Security Violation: Unauthorized Host</div></div>';
-                    throw new Error("System Halted: Security Violation");
                 }
             }
             try { checkDomain(); } catch (e) { window.stop(); }
@@ -46,16 +32,8 @@
         import { getFirestore, initializeFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         
-        // --- Firebase 配置 ---
         const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const fallbackConfig = {
-            apiKey: "AIzaSyBiu3oe1z388azShoVkqZm0IK14kBanlXI",
-            authDomain: "ordersys-5d951.firebaseapp.com",
-            projectId: "ordersys-5d951",
-            storageBucket: "ordersys-5d951.firebasestorage.app",
-            messagingSenderId: "99865299874",
-            appId: "1:99865299874:web:e891e5dcf25e5d6ab5c0fb"
-        };
+        const fallbackConfig = { apiKey: "AIzaSyBiu3oe1z388azShoVkqZm0IK14kBanlXI", authDomain: "ordersys-5d951.firebaseapp.com", projectId: "ordersys-5d951", storageBucket: "ordersys-5d951.firebasestorage.app", messagingSenderId: "99865299874", appId: "1:99865299874:web:e891e5dcf25e5d6ab5c0fb" };
         const firebaseConfig = envConfig || fallbackConfig;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'ordersys-default';
 
@@ -68,30 +46,16 @@
             const app = initializeApp(firebaseConfig);
             const db = initializeFirestore(app, { experimentalForceLongPolling: true });
             const auth = getAuth(app);
-            
             const initAuth = async () => {
                 try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                    window.db = db;
-                    window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc };
-                    window.isFirebaseReady = true;
-                    console.log("System Online (Auth Success)");
-                } catch (err) {
-                    console.warn("Auth/Network Error - Entering Offline Mode", err);
-                    window.db = db;
-                    window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc };
-                    window.isFirebaseReady = true; 
-                }
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
+                    else { await signInAnonymously(auth); }
+                    window.db = db; window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc };
+                    window.isFirebaseReady = true; console.log("System Online");
+                } catch (err) { console.warn("Offline Mode", err); window.db = db; window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc }; window.isFirebaseReady = true; }
             };
             initAuth();
-        } catch (e) {
-            window.isFirebaseReady = false;
-            console.error("Firebase Init Error", e);
-        }
+        } catch (e) { window.isFirebaseReady = false; console.error("Firebase Init Error", e); }
     </script>
 
     <style>
@@ -102,10 +66,8 @@
         #app-modal { position: fixed; inset: 0; z-index: 9999; background-color: rgba(0,0,0,0.5); }
         #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; max-width: 28rem; margin: 0 auto; background: white; }
         .btn-press:active { transform: scale(0.96); opacity: 0.8; }
-        
         input, select, textarea:not(#preview-text) { font-size: 16px !important; user-select: text !important; } 
         #preview-text { font-size: inherit; }
-
         .compact-table th, .compact-table td { padding: 4px 2px; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
@@ -123,15 +85,7 @@
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
             componentDidCatch(error, errorInfo) { console.error("UI Error:", error, errorInfo); }
             render() {
-                if (this.state.hasError) {
-                    return (
-                        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-red-50 text-red-800">
-                            <h1 className="text-xl font-bold mb-2">系统遇到阻碍</h1>
-                            <div className="bg-white p-2 rounded text-xs mb-4 max-w-full overflow-auto">{this.state.error?.message}</div>
-                            <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-6 py-2 rounded-lg font-bold">重新加载</button>
-                        </div>
-                    );
-                }
+                if (this.state.hasError) return (<div className="min-h-screen flex flex-col items-center justify-center p-4 bg-red-50 text-red-800"><h1 className="text-xl font-bold mb-2">系统遇到阻碍</h1><div className="bg-white p-2 rounded text-xs mb-4 max-w-full overflow-auto">{this.state.error?.message}</div><button onClick={() => window.location.reload()} className="bg-red-600 text-white px-6 py-2 rounded-lg font-bold">重新加载</button></div>);
                 return this.props.children;
             }
         }
@@ -150,14 +104,10 @@
             const k = {};
             const odds=ALL_NUMBERS.filter(isOdd), evens=ALL_NUMBERS.filter(isEven);
             k['单数']=odds; k['单']=odds; k['双数']=evens; k['双']=evens;
-            // 新增：大小数规则
             k['小数']=ALL_NUMBERS.filter(isSmall); k['小']=ALL_NUMBERS.filter(isSmall);
             k['大数']=ALL_NUMBERS.filter(isBig); k['大']=ALL_NUMBERS.filter(isBig);
-
-            // 新增：大小尾规则
             k['大尾']=ALL_NUMBERS.filter(n=>[5,6,7,8,9].includes(n%10));
             k['小尾']=ALL_NUMBERS.filter(n=>[0,1,2,3,4].includes(n%10));
-            
             k['小单']=ALL_NUMBERS.filter(n=>isSmall(n)&&isOdd(n)); k['小双']=ALL_NUMBERS.filter(n=>isSmall(n)&&isEven(n));
             k['大单']=ALL_NUMBERS.filter(n=>isBig(n)&&isOdd(n)); k['大双']=ALL_NUMBERS.filter(n=>isBig(n)&&isEven(n));
             k['合数单']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2!==0); k['合单']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2!==0);
@@ -171,12 +121,11 @@
 
         const PATTERN_HK = "香港|香|港"; 
         const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥"; 
+        
         const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：]*[澳门奥])|([澳门奥][\\s.,，;；:：]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(澳门香港)|(香港澳门)");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
-        
-        // --- 修复关键：移除单独的 "个" 作为金额前缀，保留 "个号" ---
+        // 修复：移除单独的 "个" 作为金额前缀
         const BASE_AMOUNT_PARTS = [`((每个号各|每个号|每号各|每个|每号|个号|各|买|x|X|号|=|每)[\\s.．。、…~＇']*\\d+(\\.\\d+)?[\\s.．。、…~＇']*[${UNITS}]?)`, `(\\d+(\\.\\d+)?[\\s.．。、…~＇']*[${UNITS}])`, `(\\d+(\\.\\d+)?x)`, `((每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。、…~＇']*[${CH_NUM}]+[\\s.．。、…~＇']*[${UNITS}]?)`, `([${CH_NUM}]+[\\s.．。、…~＇']*[${UNITS}])`, `((?<=[\\d\\s])[${CH_NUM}]+(?!([岁尾头])))`, `(?<=[号])\\d+(\\.\\d+)?`].join("|");
-        
         const REGEX_AMOUNT_NO_SLASH = new RegExp(BASE_AMOUNT_PARTS, 'gi');
         const REGEX_AMOUNT_WITH_SLASH = new RegExp(`${BASE_AMOUNT_PARTS}|(\\/[\\s.．。…~＇']*\\d+(\\.\\d+)?\\s*[${UNITS}]?)`, 'gi');
         const REGEX_CHAT_HEADER = /^.*[:：]\s*$/;
@@ -233,7 +182,6 @@
                 });
 
                 let applySuffix = true;
-                
                 for (let i = tokens.length - 1; i >= 0; i--) {
                     if (tokens[i].type === 'num') {
                         const val = tokens[i].val;
@@ -253,11 +201,8 @@
             });
             
             txt = txt.replace(/(\d+)\s+(岁|尾|头)/g, '$1$2');
-
             txt = txt.replace(/(\d{2,})\s*(尾|头)/g, (m, digits, suffix) => digits.split('').map(d => d + suffix).join(' '));
-
             txt = txt.replace(new RegExp(`([${ZODIAC_LIST.join('')}])`,'g'), ' $1 ');
-            
             txt = txt.replace(/[.,，;；、\/\-*\—–−+。：:…~＇'．Tt特]/g, ' ').replace(/[*]/g, ' ');
             
             const hasSuspiciousTen = /([尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])\s*十|十\s*(\d+[尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])/.test(txt);
@@ -273,11 +218,7 @@
                 if (t.endsWith('岁')) { 
                     const a=parseInt(t); 
                     if(!isNaN(a)) {
-                        if (a < 1 || a > 12) {
-                            hasUnknown = true;
-                        } else {
-                            for(let x=a;x<=49;x+=12) if(x>0){nums.push(x);count++} 
-                        }
+                        if (a < 1 || a > 12) { hasUnknown = true; } else { for(let x=a;x<=49;x+=12) if(x>0){nums.push(x);count++} }
                     }
                     return; 
                 }
@@ -304,11 +245,9 @@
                     return;
                 }
 
-                // --- 预处理 ---
-                // 1. 防止 "15个" 中的 "个" 字与后面的数字 "2" 粘连，造成误判。
-                //    将 "15个2" 替换为 "15 个 2"，这样 "15个" 被识别为金额单位，"2" 独立为号码。
-                let processedLine = line.replace(/(\d)个/g, '$1 ');
-
+                let processedLine = line.replace(/(\d)个/g, '$1 '); // Fix: 15个2 -> 15 2
+                
+                // 1. "奥香" in middle (Split into two lines)
                 processedLine = processedLine.replace(/([\d元块遍岁尾头][\s.,，;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)\s*(?=(?:香港|香|港))/g, '$1$2\n');
                 processedLine = processedLine.replace(/([\d元块遍岁尾头][\s.,，;；]*)(香港|香|港)\s*(?=(?:[奥澳][门]?|[新老]?[澳奥]门|噢T|溴T))/g, '$1$2\n');
 
@@ -420,22 +359,432 @@
         const ConfirmationModal = ({ confirmation }) => !confirmation ? null : ( <ModalContainer> <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4"> <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center"><Icon name="AlertTriangle" className="w-6 h-6 text-red-600"/></div> <p className="text-center font-bold text-lg text-slate-800 whitespace-pre-line">{confirmation.message}</p> <div className="flex gap-3 pt-2"> <button onClick={confirmation.onCancel} className="flex-1 py-2 rounded border hover:bg-slate-100 btn-press">取消</button> <button onClick={confirmation.onConfirm} className="flex-1 py-2 rounded bg-red-600 text-white hover:bg-red-700 btn-press">确认</button> </div> </div> </ModalContainer> );
         const CustomerSelectModal = ({ customers, onSelect, onClose }) => ( <ModalContainer> <div className="bg-white w-full max-w-sm rounded-xl p-4 max-h-[80vh] flex flex-col shadow-2xl"> <div className="flex justify-between items-center mb-4 border-b pb-2"> <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Icon name="User" className="w-5 h-5 text-indigo-600"/> 选择客户</h3> <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button> </div> <div className="flex-1 overflow-y-auto space-y-2"> {customers.map(c => <button key={c.id} onClick={()=>onSelect(c.name)} className="w-full text-left p-3 rounded-lg hover:bg-indigo-50 border border-slate-100 font-bold text-slate-700 flex items-center justify-between active:bg-indigo-100 transition-colors btn-press"><span>{c.name}</span><span className="text-xs text-slate-400 font-normal">赔{c.odds} / 退{c.rebate*100}%</span></button>)} </div> <button onClick={onClose} className="mt-4 w-full py-3 border rounded-lg text-slate-500 font-medium btn-press">取消</button> </div> </ModalContainer> );
         const MobileRiskTable = ({title,color,data,total}) => ( <div className="bg-white rounded shadow border border-slate-200 flex flex-col h-full overflow-hidden"> <div className={`p-2 text-center font-bold text-xs ${color==='red'?'bg-red-50 text-red-700':'bg-green-50 text-green-700'}`}>{title} (¥{total.toLocaleString()})</div> <div className="flex-1 overflow-y-auto"> <table className="w-full text-xs text-center"> <thead className="bg-slate-50 text-slate-400"><tr><th className="py-1">号</th><th>注</th><th>亏</th></tr></thead> <tbody>{data.map(d=><tr key={d.num} className={`border-b last:border-0 ${d.customerPL>0?'bg-red-50':''}`}><td className="py-2 font-bold">{d.num}</td><td className="text-slate-500">{d.betAmt>0?d.betAmt:'-'}</td><td className={d.customerPL>0?'text-red-600 font-bold':'text-green-600'}>{Math.round(d.customerPL)}</td></tr>)}</tbody> </table> </div> </div> );
-        const EditOrderModal = ({ batchId, onClose, onSave, onInsertNew, bets, currentYearZodiac }) => { const recs = bets.filter(b=>b.batchId===batchId); const [lines, setLines] = useState(Array.from(new Set(recs.map(r=>r.rawInput))).filter(l=>l)); const [showInsert, setShowInsert] = useState(false); const [insertText, setInsertText] = useState(''); const header = recs[0]?.originalHeader; const originalDisplay = recs[0]?.fullText || lines.join('\n'); const stats = lines.map(l => { const segs = parseContentForSegments(l, '0', currentYearZodiac); const valid = segs.length>0 && segs.every(s=>s.isValid && !s.isSuspicious); return { valid: valid && !segs.some(s=>s.hasUnknown), amt: segs.reduce((a,b)=>a + b.totalBetCount*b.amount*(b.isDualBet?2:1), 0) }; }); const renderHighlightedTokens = (text) => { const tokens = text.split(new RegExp(`([\\s.,，;；、*\\/。．…~＇' -]+|[${ZODIAC_LIST.join('')}])`)); return tokens.map((t, idx) => { if (!t) return null; if (/^[.,，;；、*\/。．…~＇' -]+$/.test(t)) return <span key={idx} className="text-slate-400">{t}</span>; let isValid = !isNaN(parseInt(t)) ? (parseInt(t)>=1&&parseInt(t)<=49) : (KEYWORDS[t.toUpperCase()] || ZODIAC_LIST.includes(t) || /^[岁尾头]$/.test(t.slice(-1)) || ['各','买','x','X','号','=','每','元','米','斤','块','个','个号'].some(k=>t.includes(k)) || /^合(数)?\d+$/.test(t)); return <span key={idx} className={`inline-block px-1 rounded mx-0.5 ${isValid?'bg-green-100 text-green-800':'bg-red-600 text-white font-bold'}`}>{t}</span>; }); }; const handleConfirmInsert = () => { if (!insertText.trim()) { setShowInsert(false); return; } onInsertNew(batchId, insertText); setInsertText(''); setShowInsert(false); }; return ( <ModalContainer> <div className="bg-white w-full h-[80vh] rounded-xl flex flex-col overflow-hidden"> <div className="p-4 border-b flex justify-between items-center bg-slate-50"><div className="font-bold text-lg">订单校对 <div className="text-xs font-normal text-slate-500 mt-1">{header}</div></div><div className="text-indigo-600 font-bold text-xl">¥{stats.reduce((a,b)=>a+b.amt,0)}</div></div> <div className="flex-1 overflow-y-auto p-4 space-y-4"> {!showInsert ? ( <> <div className="bg-yellow-50 p-3 rounded text-xs text-slate-600 border border-yellow-100"><strong className="block mb-1">原始记录:</strong><pre className="whitespace-pre-wrap font-mono break-all">{originalDisplay}</pre>{recs[0]?.originalTotal && <div className="mt-1 text-orange-600 font-bold">客户手写: {recs[0].originalTotal}</div>}</div> {lines.map((l,i)=><div key={i} className="space-y-1"><div className={`flex gap-2 p-2 rounded border ${!stats[i].valid?'border-red-300 bg-red-50':'border-slate-200'}`}><span className="text-slate-400 w-4 pt-2 text-xs">{i+1}</span><textarea value={l} onChange={e=>{const n=[...lines];n[i]=e.target.value;setLines(n)}} className="flex-1 bg-transparent outline-none text-sm resize-none h-auto overflow-hidden break-all" rows={1} style={{minHeight:'24px'}}/><div className="text-right"><div className="text-xs text-slate-400 font-bold">¥{stats[i].amt}</div><button onClick={()=>{const n=[...lines];n.splice(i,1);setLines(n)}} className="text-red-400 mt-1"><Icon name="X" className="w-4 h-4"/></button></div></div>{!stats[i].valid && (<div className="text-xs p-2 ml-6 bg-red-50 border border-red-100 rounded"><div className="text-red-500 mb-1 font-bold">纠错预览 (红色为异常内容):</div><div className="flex flex-wrap items-center">{renderHighlightedTokens(l)}</div></div>)}</div>)} <div className="flex gap-2 pt-2"><button onClick={()=>setLines([...lines,''])} className="flex-1 py-3 border-2 border-dashed rounded text-slate-400 font-bold btn-press text-sm">+ 添加空行</button><button onClick={()=>setShowInsert(true)} className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 bg-indigo-50/50 rounded font-bold btn-press flex items-center justify-center gap-1 text-sm"><Icon name="PlusCircle" className="w-4 h-4"/> 插入新订单</button></div> </> ) : ( <div className="h-full flex flex-col animate-fade-in"><div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 mb-3 text-sm text-indigo-800"><strong>功能说明：</strong><br/>您输入的内容将生成一个<b>独立的订单</b>，并插入到当前订单之后（原来的后续订单会自动顺延）。</div><textarea className="flex-1 w-full p-3 border-2 border-indigo-100 rounded-lg bg-slate-50 focus:bg-white focus:border-indigo-500 outline-none resize-none font-mono text-base" placeholder="在此粘贴新的注单内容... (例如: 狗.猪.羊各20)" value={insertText} onChange={e => setInsertText(e.target.value)} autoFocus /><div className="flex gap-3 mt-4"><button onClick={()=>setShowInsert(false)} className="flex-1 py-3 border rounded-lg font-bold text-slate-500 btn-press">返回</button><button onClick={handleConfirmInsert} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow btn-press">确认插入</button></div></div> )} </div> {!showInsert && (<div className="p-4 border-t flex gap-3"><button onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold btn-press">取消</button><button onClick={()=>onSave(batchId, lines.filter(x=>x.trim()))} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow btn-press">保存修改</button></div>)} </div> </ModalContainer> ); };
-        const InsertOrderModal = ({ customerName, onClose, onSave }) => { const [text, setText] = useState(''); return ( <ModalContainer> <div className="bg-white w-full max-w-sm rounded-xl p-4 shadow-2xl flex flex-col h-[60vh] animate-fade-in"> <div className="flex justify-between items-center mb-4 border-b pb-2"> <h3 className="font-bold text-lg text-slate-800">插入订单: {customerName}</h3> <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button> </div> <textarea className="flex-1 w-full p-4 border rounded-lg bg-slate-50 font-mono text-base resize-none focus:bg-white focus:border-indigo-500 outline-none" placeholder="在此输入注单内容... (例如: 1.2.3各10)" value={text} onChange={e => setText(e.target.value)} /> <div className="flex gap-3 mt-4"> <button onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold text-slate-500 btn-press">取消</button> <button onClick={() => onSave(customerName, text)} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg btn-press">确认提交</button> </div> </div> </ModalContainer> ); };
-        const RawRecordModal = ({ batch, onClose }) => ( <ModalContainer> <div className="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl"> <h3 className="font-bold text-lg mb-4 border-b pb-2">原始下单记录</h3> <div className="bg-slate-100 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto text-slate-700"> <div className="font-bold mb-2 text-slate-900">{batch.header}</div> {batch.originalTotal && <div className="text-orange-600 font-bold mb-2">手写总计: {batch.originalTotal}</div>} <pre className="whitespace-pre-wrap break-all">{batch.fullText || batch.lines.join('\n')}</pre> </div> <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow btn-press">关闭</button> </div> </ModalContainer> );
-        const HedgingModal = ({ onClose, riskStats, riskFilter, customers, bets, showAlert, transfers, onSaveTransfers, lastHedgingText, setLastHedgingText }) => { const [activeType, setActiveType] = useState(riskFilter==='HK'?'HK':'MO'); const [hedgingTarget, setHedgingTarget] = useState('ALL'); const [maxLossLimit, setMaxLossLimit] = useState('0'); const [maxBetLimit, setMaxBetLimit] = useState('500'); const [copyMsg, setCopyMsg] = useState(''); const [transferHistory, setTransferHistory] = useState({}); const [suggestedEat, setSuggestedEat] = useState(0); const activeCustomers = useMemo(() => Array.from(new Set(bets.map(b => b.customerName))).sort(), [bets]); useEffect(() => setTransferHistory({}), [activeType]); const currentRiskStats = useMemo(() => { let filtered = bets.filter(b => !b.isError && !b.isTransferred); if (hedgingTarget !== 'ALL') filtered = filtered.filter(b => b.customerName === hedgingTarget); const stats = { hk:Array.from({length:49},(_,i)=>({num:i+1, totalBet:0})), mo:Array.from({length:49},(_,i)=>({num:i+1, totalBet:0})) }; let [hkTotalPool, moTotalPool] = [0,0]; filtered.forEach(b => { if(b.type==='HK'){ hkTotalPool+=b.totalAmount; } else { moTotalPool+=b.totalAmount; } b.numbers.forEach(n=>{ if(n>=1&&n<=49){ const t=b.type==='HK'?stats.hk[n-1]:stats.mo[n-1]; t.totalBet+=b.amountPerNumber; } }); }); const enrich = (list, type, rawTotalPool) => { const totalTransferred = Object.values(transfers[type] || {}).reduce((a,b)=>a+b, 0); return list.map(i => { const transferred = transfers[type]?.[i.num] || 0; const netBet = Math.max(0, i.totalBet - transferred); return { ...i, transferred, netBet }; }).sort((a,b)=>b.netBet-a.netBet); }; return { hk: { list: enrich(stats.hk, 'HK'), pool: hkTotalPool }, mo: { list: enrich(stats.mo, 'MO'), pool: moTotalPool } }; }, [bets, customers, hedgingTarget, transfers]); const { list: data, pool: rawTotalPool } = activeType === 'HK' ? currentRiskStats.hk : currentRiskStats.mo; const displayData = useMemo(() => { const limit = parseFloat(maxBetLimit) || 0; const processed = data.map(d => { const advice = Math.max(0, d.netBet - limit); const postTransferHolding = d.netBet - advice; return { ...d, advice, postTransferHolding }; }); const finalPool = processed.reduce((acc, d) => acc + d.postTransferHolding, 0); return processed.map(d => { const payout = d.postTransferHolding * 48; const bankerPL = finalPool - payout; return { ...d, bankerPL, finalPool }; }); }, [data, maxBetLimit, rawTotalPool]); useEffect(() => { const currentPool = data.reduce((acc, d) => acc + d.netBet, 0); const suggested = Math.floor(currentPool / 24); setSuggestedEat(suggested > 0 ? suggested : 0); }, [data]); const maxWin = Math.max(...displayData.map(d => d.bankerPL)); const maxLoss = Math.min(...displayData.map(d => d.bankerPL)); const copyAndSave = () => { const toTransfer = displayData.filter(d => d.advice > 0); if (toTransfer.length === 0) { showAlert("没有需要转出的注单", "warning"); return; } const lines = toTransfer.map(d => `${d.num}=${d.advice}`); const textToCopy = lines.join(' '); const el = document.createElement('textarea'); el.value = textToCopy; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); setLastHedgingText(textToCopy); const newTransfers = { ...transfers }; if (!newTransfers[activeType]) newTransfers[activeType] = {}; toTransfer.forEach(d => { newTransfers[activeType][d.num] = (newTransfers[activeType][d.num] || 0) + d.advice; }); onSaveTransfers(newTransfers); setCopyMsg('已复制并保存!'); setTimeout(()=>setCopyMsg(''), 2000); }; const handleReCopy = () => { if (!lastHedgingText) return; const el = document.createElement('textarea'); el.value = lastHedgingText; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); setCopyMsg('已再次复制!'); setTimeout(()=>setCopyMsg(''), 2000); }; const renderPL = (val) => { const rounded = Math.round(val); return <span className={rounded >= 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}>{rounded > 0 ? '+'+rounded : rounded}</span> }; return ( <ModalContainer> <div className="bg-white z-[5000] flex flex-col w-full h-[100dvh]"> <div className="p-3 bg-slate-100 border-b flex justify-between items-center shrink-0"><h3 className="font-bold flex items-center gap-2 text-base"><Icon name="Scale" className="w-5 h-5"/> 智能转单 v7.09</h3><button onClick={onClose} className="btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button></div> <div className="bg-blue-50 p-2 text-xs grid grid-cols-2 gap-x-4 border-b border-blue-100 shrink-0"> <div><div className="flex justify-between"><span>转后最大赢:</span>{renderPL(maxWin)}</div></div> <div><div className="flex justify-between"><span>转后最大赔:</span>{renderPL(maxLoss)}</div></div> </div> <div className="bg-white p-2 text-sm grid grid-cols-2 gap-4 border-b border-slate-100 shrink-0"> <div className="flex flex-col gap-1"> <span className="text-slate-500 text-xs">建议吃码:</span> <span className="text-green-600 font-bold text-lg">{suggestedEat}</span> </div> <div className="flex flex-col gap-1"> <span className="text-slate-500 text-xs">最大吃码 (手动):</span> <input type="number" value={maxBetLimit} onChange={e=>setMaxBetLimit(e.target.value)} className="w-full border-b-2 border-indigo-300 bg-transparent font-bold text-indigo-700 text-lg outline-none focus:border-indigo-600"/> </div> </div> <div className="p-2 bg-white shrink-0 flex justify-between items-center border-b"> <div className="flex border rounded overflow-hidden text-xs font-bold"><button onClick={()=>setActiveType('MO')} className={`px-3 py-1.5 ${activeType==='MO'?'bg-green-500 text-white':'bg-slate-100 text-slate-600'}`}>澳门</button><button onClick={()=>setActiveType('HK')} className={`px-3 py-1.5 ${activeType==='HK'?'bg-red-500 text-white':'bg-slate-100 text-slate-600'}`}>香港</button></div> <select className="border rounded px-2 py-1 text-xs max-w-[120px]" value={hedgingTarget} onChange={e=>setHedgingTarget(e.target.value)}><option value="ALL">全部订单</option><optgroup label="下注客户">{activeCustomers.map(n=><option key={n} value={n}>{n}</option>)}</optgroup></select> </div> <div className="flex-1 overflow-y-auto p-0 bg-slate-50"> <table className="w-full text-xs text-center border-collapse compact-table"><thead className="bg-slate-200 sticky top-0 z-10"><tr><th className="w-8">号</th><th>总注</th><th>已转</th><th>实持</th><th>本次</th><th>转后险 (庄家)</th></tr></thead> <tbody className="divide-y divide-slate-200 bg-white">{displayData.map(d=><tr key={d.num} className={d.advice>0?'bg-orange-50':''}><td className="font-bold border-r bg-slate-50">{d.num}</td><td className="text-slate-400">{d.totalBet}</td><td className="text-slate-400">{d.transferred}</td><td className="font-bold">{d.netBet}</td><td className="text-orange-600 font-bold">{d.advice>0?d.advice:'-'}</td><td className="font-bold">{renderPL(d.bankerPL)}</td></tr>)}</tbody> </table> </div> <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding flex gap-2"><button onClick={onClose} className="w-16 bg-slate-100 border rounded-xl font-bold btn-press text-slate-500">关闭</button> {lastHedgingText && ( <button onClick={handleReCopy} className="w-16 bg-orange-100 text-orange-600 border border-orange-200 rounded-xl font-bold btn-press flex items-center justify-center shadow-sm active:scale-95" title="再次复制上次内容"><Icon name="RefreshCw" className="w-5 h-5"/></button> )} <button onClick={copyAndSave} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow flex items-center justify-center gap-2 btn-press"><Icon name="ClipboardCheck" className="w-5 h-5"/> {copyMsg||`复制并保存 (${displayData.filter(d=>d.advice>0).length})`}</button></div> </div> </ModalContainer> ); };
+        
+        const EditOrderModal = ({ batchId, onClose, onSave, onInsertNew, bets, currentYearZodiac }) => { 
+            const recs = bets.filter(b=>b.batchId===batchId); 
+            
+            // --- 修复：不再使用 Set 去重，而是智能合并相邻的双边注单，保留非相邻的重复行 ---
+            const [lines, setLines] = useState(() => {
+                const result = [];
+                for (let i = 0; i < recs.length; i++) {
+                    const curr = recs[i];
+                    const next = recs[i+1];
+                    // 如果当前条目和下一条目原始内容相同，且类型不同（说明是港澳双边），则合并显示为一行
+                    if (next && curr.rawInput === next.rawInput && curr.type !== next.type) {
+                        result.push(curr.rawInput);
+                        i++; 
+                    } else {
+                        result.push(curr.rawInput);
+                    }
+                }
+                return result.filter(l => l && l.trim());
+            });
 
-        const AdminPanel = ({ onClose, db }) => { const [code, setCode] = useState(''); const [days, setDays] = useState(30); const [codes, setCodes] = useState([]); const [renewTarget, setRenewTarget] = useState(null); const [renewDays, setRenewDays] = useState(30); const fetchCodes = async () => { if(!db || !window.fb) return; try { const snap = await window.fb.getDocs(window.fb.collection(db, ...window.DB_PATH.getCollectionArgs("access_codes"))); setCodes(snap.docs.map(d => ({id: d.id, ...d.data()}))); } catch(e) { alert("获取数据失败: " + e.message); } }; useEffect(() => { fetchCodes(); }, []); const handleCreate = async () => { if(!code) return; if(!db || !window.fb) { alert("数据库未连接"); return; } const expiry = new Date(); expiry.setDate(expiry.getDate() + parseInt(days)); await window.fb.setDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", code)), { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} } }); alert("访问码 " + code + " 创建成功！"); fetchCodes(); setCode(''); }; const handleRenew = async () => { if (!renewTarget) return; const now = Date.now(); const baseTime = renewTarget.expiresAt > now ? renewTarget.expiresAt : now; const newExpiry = baseTime + parseInt(renewDays) * 24 * 60 * 60 * 1000; await window.fb.updateDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", renewTarget.id)), { expiresAt: newExpiry }); alert(`用户 ${renewTarget.id} 已成功延期！`); setRenewTarget(null); fetchCodes(); }; const handleDelete = async (id) => { if(confirm("确定删除 " + id + " 吗？此操作不可恢复！")) { await window.fb.deleteDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id))); fetchCodes(); } }; return ( <div className="fixed inset-0 bg-white z-[5000] p-4 flex flex-col animate-fade-in"> <div className="flex justify-between items-center mb-4 border-b pb-2"> <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="Lock" className="w-6 h-6"/> 管理员控制台</h2> <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6"/></button> </div> <div className="mb-6 p-4 bg-indigo-50 rounded-xl space-y-4 shadow-sm border border-indigo-100"> <h3 className="font-bold text-indigo-900 flex items-center gap-2"><Icon name="UserPlus" className="w-5 h-5"/> 生成新访问码</h3> <div className="flex gap-2"> <input value={code} onChange={e=>setCode(e.target.value)} placeholder="设置用户密码 (如: 8888)" className="border p-3 rounded-lg flex-1 outline-none focus:ring-2 focus:ring-indigo-500"/> <select value={days} onChange={e=>setDays(e.target.value)} className="border p-3 rounded-lg bg-white outline-none"> <option value="1">1天</option> <option value="3">3天</option> <option value="7">7天</option> <option value="30">30天</option> <option value="60">2个月</option> <option value="90">3个月</option> <option value="180">半年</option> <option value="365">1年</option> </select> </div> <button onClick={handleCreate} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md btn-press">创建用户账号</button> </div> <div className="flex-1 overflow-y-auto"> <h3 className="font-bold mb-3 text-gray-700 px-1">已存在的用户列表</h3> {codes.map(c => { const isExpired = Date.now() > c.expiresAt; return ( <div key={c.id} className="flex justify-between items-center p-4 border-b bg-white hover:bg-gray-50 transition-colors"> <div> <div className="font-bold text-lg text-gray-800 flex items-center gap-2"> {c.id} {isExpired && <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded">已过期</span>} </div> <div className="text-xs text-gray-400 mt-1">有效期至: {new Date(c.expiresAt).toLocaleDateString()}</div> </div> <div className="flex gap-2"> <button onClick={()=>setRenewTarget(c)} className="text-blue-600 bg-blue-50 px-3 py-2 rounded-lg font-bold text-xs btn-press flex items-center gap-1"><Icon name="Calendar" className="w-4 h-4"/> 延期</button> <button onClick={()=>handleDelete(c.id)} className="text-red-500 bg-red-50 p-2 rounded-lg btn-press"><Icon name="Trash2" className="w-5 h-5"/></button> </div> </div> ); })} </div> {renewTarget && ( <div className="fixed inset-0 bg-black/50 z-[6000] flex items-center justify-center p-4 animate-fade-in"> <div className="bg-white w-full max-w-sm rounded-xl p-5 shadow-2xl"> <h3 className="font-bold text-lg mb-4 text-slate-800">为用户 {renewTarget.id} 延期</h3> <p className="text-xs text-slate-500 mb-4">当前有效期至: {new Date(renewTarget.expiresAt).toLocaleDateString()}</p> <div className="space-y-2 mb-6"> <div className="text-sm font-bold text-slate-600">选择延长时间:</div> <select value={renewDays} onChange={e=>setRenewDays(e.target.value)} className="w-full border p-3 rounded-lg bg-slate-50 outline-none"> <option value="1">1天</option> <option value="3">3天</option> <option value="7">7天</option> <option value="30">30天</option> <option value="60">2个月</option> <option value="90">3个月</option> <option value="180">半年</option> <option value="365">1年</option> </select> </div> <div className="flex gap-3"> <button onClick={()=>setRenewTarget(null)} className="flex-1 py-3 border rounded-lg text-slate-500 font-bold btn-press">取消</button> <button onClick={handleRenew} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg btn-press">确认延期</button> </div> </div> </div> )} </div> ); };
-        const LoginScreen = ({ onLogin, onAdmin }) => { const [code, setCode] = useState(''); const [loading, setLoading] = useState(false); const handleLogin = async () => { if(!code) return; if (!window.isFirebaseReady) { alert("正在连接云端数据库，请稍等 2-3 秒后重试..."); return; } if(code === 'admin888') { onAdmin(); return; } setLoading(true); try { const docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", code)); const docSnap = await window.fb.getDoc(docRef); if (docSnap.exists()) { const data = docSnap.data(); if (Date.now() > data.expiresAt) { alert("此访问码已过期，请联系管理员续费。"); } else { onLogin(code, data); } } else { alert("访问码不存在，请重试！"); } } catch(e) { console.error(e); alert("登录出错: " + e.message); } setLoading(false); }; return ( <div className="min-h-screen login-bg flex items-center justify-center p-4"> <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in"> <div className="text-center"> <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner"> <Icon name="Zap" className="w-8 h-8"/> </div> <h1 className="text-2xl font-bold text-gray-800">系统登录</h1> <p className="text-gray-400 text-sm mt-2">请输入管理员提供的访问码</p> </div> <div className="space-y-4"> <input type="text" value={code} onChange={e=>setCode(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none py-4 tracking-widest bg-gray-50 focus:bg-white transition-all text-indigo-900" placeholder="输入访问码" /> <button onClick={handleLogin} disabled={loading} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all btn-press disabled:opacity-50 disabled:cursor-not-allowed"> {loading ? "正在验证..." : "进入系统"} </button> </div> <div className="text-center text-xs text-gray-300 pt-4">v7.16 (终极稳定版)</div> </div> </div> ); };
+            const [showInsert, setShowInsert] = useState(false); 
+            const [insertText, setInsertText] = useState(''); 
+            const header = recs[0]?.originalHeader; 
+            const originalDisplay = recs[0]?.fullText || lines.join('\n'); 
+            const stats = lines.map(l => { 
+                const segs = parseContentForSegments(l, '0', currentYearZodiac); 
+                const valid = segs.length>0 && segs.every(s=>s.isValid && !s.isSuspicious); 
+                return { valid: valid && !segs.some(s=>s.hasUnknown), amt: segs.reduce((a,b)=>a + b.totalBetCount*b.amount*(b.isDualBet?2:1), 0) }; 
+            }); 
+            
+            const renderHighlightedTokens = (text) => { 
+                const tokens = text.split(new RegExp(`([\\s.,，;；、*\\/。．…~＇' -]+|[${ZODIAC_LIST.join('')}])`)); 
+                return tokens.map((t, idx) => { 
+                    if (!t) return null; 
+                    if (/^[.,，;；、*\/。．…~＇' -]+$/.test(t)) return <span key={idx} className="text-slate-400">{t}</span>; 
+                    let isValid = !isNaN(parseInt(t)) ? (parseInt(t)>=1&&parseInt(t)<=49) : (KEYWORDS[t.toUpperCase()] || ZODIAC_LIST.includes(t) || /^[岁尾头]$/.test(t.slice(-1)) || ['各','买','x','X','号','=','每','元','米','斤','块','个','个号'].some(k=>t.includes(k)) || /^合(数)?\d+$/.test(t)); 
+                    return <span key={idx} className={`inline-block px-1 rounded mx-0.5 ${isValid?'bg-green-100 text-green-800':'bg-red-600 text-white font-bold'}`}>{t}</span>; 
+                }); 
+            }; 
+
+            const handleConfirmInsert = () => {
+                if (!insertText.trim()) { setShowInsert(false); return; }
+                onInsertNew(batchId, insertText);
+                setInsertText('');
+                setShowInsert(false);
+            };
+
+            return ( 
+                <ModalContainer> 
+                    <div className="bg-white w-full h-[80vh] rounded-xl flex flex-col overflow-hidden"> 
+                        <div className="p-4 border-b flex justify-between items-center bg-slate-50">
+                            <div className="font-bold text-lg">订单校对 <div className="text-xs font-normal text-slate-500 mt-1">{header}</div></div>
+                            <div className="text-indigo-600 font-bold text-xl">¥{stats.reduce((a,b)=>a+b.amt,0)}</div>
+                        </div> 
+                        
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4"> 
+                            {!showInsert ? (
+                                <>
+                                    <div className="bg-yellow-50 p-3 rounded text-xs text-slate-600 border border-yellow-100">
+                                        <strong className="block mb-1">原始记录:</strong>
+                                        <pre className="whitespace-pre-wrap font-mono break-all">{originalDisplay}</pre>
+                                        {recs[0]?.originalTotal && <div className="mt-1 text-orange-600 font-bold">客户手写: {recs[0].originalTotal}</div>}
+                                    </div> 
+                                    {lines.map((l,i)=>(
+                                        <div key={i} className="space-y-1">
+                                            <div className={`flex gap-2 p-2 rounded border ${!stats[i].valid?'border-red-300 bg-red-50':'border-slate-200'}`}>
+                                                <span className="text-slate-400 w-4 pt-2 text-xs">{i+1}</span>
+                                                <textarea value={l} onChange={e=>{const n=[...lines];n[i]=e.target.value;setLines(n)}} className="flex-1 bg-transparent outline-none text-sm resize-none h-auto overflow-hidden break-all" rows={1} style={{minHeight:'24px'}}/>
+                                                <div className="text-right">
+                                                    <div className="text-xs text-slate-400 font-bold">¥{stats[i].amt}</div>
+                                                    <button onClick={()=>{const n=[...lines];n.splice(i,1);setLines(n)}} className="text-red-400 mt-1"><Icon name="X" className="w-4 h-4"/></button>
+                                                </div>
+                                            </div>
+                                            {!stats[i].valid && (<div className="text-xs p-2 ml-6 bg-red-50 border border-red-100 rounded"><div className="text-red-500 mb-1 font-bold">纠错预览 (红色为异常内容):</div><div className="flex flex-wrap items-center">{renderHighlightedTokens(l)}</div></div>)}
+                                        </div>
+                                    ))}
+                                    
+                                    <div className="flex gap-2 pt-2">
+                                        <button onClick={()=>setLines([...lines,''])} className="flex-1 py-3 border-2 border-dashed rounded text-slate-400 font-bold btn-press text-sm">+ 添加空行</button>
+                                        <button onClick={()=>setShowInsert(true)} className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 bg-indigo-50/50 rounded font-bold btn-press flex items-center justify-center gap-1 text-sm"><Icon name="PlusCircle" className="w-4 h-4"/> 插入新订单</button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="h-full flex flex-col animate-fade-in">
+                                    <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 mb-3 text-sm text-indigo-800">
+                                        <strong>功能说明：</strong><br/>
+                                        您输入的内容将生成一个<b>独立的订单</b>，并插入到当前订单之后（原来的后续订单会自动顺延）。
+                                    </div>
+                                    <textarea 
+                                        className="flex-1 w-full p-3 border-2 border-indigo-100 rounded-lg bg-slate-50 focus:bg-white focus:border-indigo-500 outline-none resize-none font-mono text-base"
+                                        placeholder="在此粘贴新的注单内容... (例如: 狗.猪.羊各20)"
+                                        value={insertText}
+                                        onChange={e => setInsertText(e.target.value)}
+                                        autoFocus
+                                    />
+                                    <div className="flex gap-3 mt-4">
+                                        <button onClick={()=>setShowInsert(false)} className="flex-1 py-3 border rounded-lg font-bold text-slate-500 btn-press">返回</button>
+                                        <button onClick={handleConfirmInsert} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow btn-press">确认插入</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div> 
+                        
+                        {!showInsert && (
+                            <div className="p-4 border-t flex gap-3">
+                                <button onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold btn-press">取消</button>
+                                <button onClick={()=>onSave(batchId, lines.filter(x=>x.trim()))} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow btn-press">保存修改</button>
+                            </div> 
+                        )}
+                    </div> 
+                </ModalContainer> 
+            ); 
+        };
+
+        const InsertOrderModal = ({ customerName, onClose, onSave }) => {
+            const [text, setText] = useState('');
+            return (
+                <ModalContainer>
+                    <div className="bg-white w-full max-w-sm rounded-xl p-4 shadow-2xl flex flex-col h-[60vh] animate-fade-in">
+                        <div className="flex justify-between items-center mb-4 border-b pb-2">
+                            <h3 className="font-bold text-lg text-slate-800">插入订单: {customerName}</h3>
+                            <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button>
+                        </div>
+                        <textarea 
+                            className="flex-1 w-full p-4 border rounded-lg bg-slate-50 font-mono text-base resize-none focus:bg-white focus:border-indigo-500 outline-none" 
+                            placeholder="在此输入注单内容... (例如: 1.2.3各10)"
+                            value={text}
+                            onChange={e => setText(e.target.value)}
+                        />
+                        <div className="flex gap-3 mt-4">
+                            <button onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold text-slate-500 btn-press">取消</button>
+                            <button onClick={() => onSave(customerName, text)} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg btn-press">确认提交</button>
+                        </div>
+                    </div>
+                </ModalContainer>
+            );
+        };
+        const RawRecordModal = ({ batch, onClose }) => ( <ModalContainer> <div className="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl"> <h3 className="font-bold text-lg mb-4 border-b pb-2">原始下单记录</h3> <div className="bg-slate-100 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto text-slate-700"> <div className="font-bold mb-2 text-slate-900">{batch.header}</div> {batch.originalTotal && <div className="text-orange-600 font-bold mb-2">手写总计: {batch.originalTotal}</div>} <pre className="whitespace-pre-wrap break-all">{batch.fullText || batch.lines.join('\n')}</pre> </div> <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow btn-press">关闭</button> </div> </ModalContainer> );
+        
+        const HedgingModal = ({ onClose, riskStats, riskFilter, customers, bets, showAlert, transfers, onSaveTransfers, lastHedgingText, setLastHedgingText }) => { 
+            const [activeType, setActiveType] = useState(riskFilter==='HK'?'HK':'MO'); 
+            const [hedgingTarget, setHedgingTarget] = useState('ALL'); 
+            const [maxLossLimit, setMaxLossLimit] = useState('0'); 
+            const [maxBetLimit, setMaxBetLimit] = useState('500'); 
+            const [copyMsg, setCopyMsg] = useState(''); 
+            const [transferHistory, setTransferHistory] = useState({}); 
+            const [suggestedEat, setSuggestedEat] = useState(0); 
+            const activeCustomers = useMemo(() => Array.from(new Set(bets.map(b => b.customerName))).sort(), [bets]); 
+            
+            useEffect(() => setTransferHistory({}), [activeType]); 
+            
+            const currentRiskStats = useMemo(() => { 
+                let filtered = bets.filter(b => !b.isError && !b.isTransferred); 
+                if (hedgingTarget !== 'ALL') filtered = filtered.filter(b => b.customerName === hedgingTarget); 
+                const stats = { hk:Array.from({length:49},(_,i)=>({num:i+1, totalBet:0})), mo:Array.from({length:49},(_,i)=>({num:i+1, totalBet:0})) }; 
+                let [hkTotalPool, moTotalPool] = [0,0]; 
+                filtered.forEach(b => { 
+                    if(b.type==='HK'){ hkTotalPool+=b.totalAmount; } else { moTotalPool+=b.totalAmount; } 
+                    b.numbers.forEach(n=>{ if(n>=1&&n<=49){ const t=b.type==='HK'?stats.hk[n-1]:stats.mo[n-1]; t.totalBet+=b.amountPerNumber; } }); 
+                }); 
+                const enrich = (list, type, rawTotalPool) => { 
+                    const totalTransferred = Object.values(transfers[type] || {}).reduce((a,b)=>a+b, 0); 
+                    return list.map(i => { 
+                        const transferred = transfers[type]?.[i.num] || 0; 
+                        const netBet = Math.max(0, i.totalBet - transferred); 
+                        return { ...i, transferred, netBet }; 
+                    }).sort((a,b)=>b.netBet-a.netBet); 
+                }; 
+                return { hk: { list: enrich(stats.hk, 'HK'), pool: hkTotalPool }, mo: { list: enrich(stats.mo, 'MO'), pool: moTotalPool } }; 
+            }, [bets, customers, hedgingTarget, transfers]); 
+            
+            const { list: data, pool: rawTotalPool } = activeType === 'HK' ? currentRiskStats.hk : currentRiskStats.mo; 
+            
+            const displayData = useMemo(() => { 
+                const limit = parseFloat(maxBetLimit) || 0; 
+                const processed = data.map(d => { 
+                    const advice = Math.max(0, d.netBet - limit); 
+                    const postTransferHolding = d.netBet - advice; 
+                    return { ...d, advice, postTransferHolding }; 
+                }); 
+                const finalPool = processed.reduce((acc, d) => acc + d.postTransferHolding, 0); 
+                return processed.map(d => { 
+                    const payout = d.postTransferHolding * 48; 
+                    const bankerPL = finalPool - payout; 
+                    return { ...d, bankerPL, finalPool }; 
+                }); 
+            }, [data, maxBetLimit, rawTotalPool]); 
+            
+            useEffect(() => { 
+                const currentPool = data.reduce((acc, d) => acc + d.netBet, 0); 
+                const suggested = Math.floor(currentPool / 24); 
+                setSuggestedEat(suggested > 0 ? suggested : 0); 
+            }, [data]); 
+            
+            const maxWin = Math.max(...displayData.map(d => d.bankerPL)); 
+            const maxLoss = Math.min(...displayData.map(d => d.bankerPL)); 
+            
+            const copyAndSave = () => { 
+                const toTransfer = displayData.filter(d => d.advice > 0); 
+                if (toTransfer.length === 0) { showAlert("没有需要转出的注单", "warning"); return; } 
+                
+                const lines = toTransfer.map(d => `${d.num}=${d.advice}`); 
+                const textToCopy = lines.join(' '); 
+
+                const el = document.createElement('textarea'); 
+                el.value = textToCopy; 
+                document.body.appendChild(el); 
+                el.select(); 
+                document.execCommand('copy'); 
+                document.body.removeChild(el); 
+                
+                setLastHedgingText(textToCopy);
+
+                const newTransfers = { ...transfers }; 
+                if (!newTransfers[activeType]) newTransfers[activeType] = {}; 
+                toTransfer.forEach(d => { newTransfers[activeType][d.num] = (newTransfers[activeType][d.num] || 0) + d.advice; }); 
+                onSaveTransfers(newTransfers); 
+                setCopyMsg('已复制并保存!'); 
+                setTimeout(()=>setCopyMsg(''), 2000); 
+            }; 
+            
+            const handleReCopy = () => {
+                if (!lastHedgingText) return;
+                const el = document.createElement('textarea');
+                el.value = lastHedgingText;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                setCopyMsg('已再次复制!');
+                setTimeout(()=>setCopyMsg(''), 2000);
+            };
+
+            const renderPL = (val) => { const rounded = Math.round(val); return <span className={rounded >= 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}>{rounded > 0 ? '+'+rounded : rounded}</span> }; 
+            
+            return ( 
+                <ModalContainer> 
+                    <div className="bg-white z-[5000] flex flex-col w-full h-[100dvh]"> 
+                        <div className="p-3 bg-slate-100 border-b flex justify-between items-center shrink-0"><h3 className="font-bold flex items-center gap-2 text-base"><Icon name="Scale" className="w-5 h-5"/> 智能转单 v7.09</h3><button onClick={onClose} className="btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button></div> 
+                        <div className="bg-blue-50 p-2 text-xs grid grid-cols-2 gap-x-4 border-b border-blue-100 shrink-0"> <div><div className="flex justify-between"><span>转后最大赢:</span>{renderPL(maxWin)}</div></div> <div><div className="flex justify-between"><span>转后最大赔:</span>{renderPL(maxLoss)}</div></div> </div> 
+                        <div className="bg-white p-2 text-sm grid grid-cols-2 gap-4 border-b border-slate-100 shrink-0"> 
+                            <div className="flex flex-col gap-1"> <span className="text-slate-500 text-xs">建议吃码:</span> <span className="text-green-600 font-bold text-lg">{suggestedEat}</span> </div> 
+                            <div className="flex flex-col gap-1"> <span className="text-slate-500 text-xs">最大吃码 (手动):</span> <input type="number" value={maxBetLimit} onChange={e=>setMaxBetLimit(e.target.value)} className="w-full border-b-2 border-indigo-300 bg-transparent font-bold text-indigo-700 text-lg outline-none focus:border-indigo-600"/> </div> 
+                        </div> 
+                        <div className="p-2 bg-white shrink-0 flex justify-between items-center border-b"> 
+                            <div className="flex border rounded overflow-hidden text-xs font-bold"><button onClick={()=>setActiveType('MO')} className={`px-3 py-1.5 ${activeType==='MO'?'bg-green-500 text-white':'bg-slate-100 text-slate-600'}`}>澳门</button><button onClick={()=>setActiveType('HK')} className={`px-3 py-1.5 ${activeType==='HK'?'bg-red-500 text-white':'bg-slate-100 text-slate-600'}`}>香港</button></div> 
+                            <select className="border rounded px-2 py-1 text-xs max-w-[120px]" value={hedgingTarget} onChange={e=>setHedgingTarget(e.target.value)}><option value="ALL">全部订单</option><optgroup label="下注客户">{activeCustomers.map(n=><option key={n} value={n}>{n}</option>)}</optgroup></select> 
+                        </div> 
+                        <div className="flex-1 overflow-y-auto p-0 bg-slate-50"> 
+                            <table className="w-full text-xs text-center border-collapse compact-table"><thead className="bg-slate-200 sticky top-0 z-10"><tr><th className="w-8">号</th><th>总注</th><th>已转</th><th>实持</th><th>本次</th><th>转后险 (庄家)</th></tr></thead> <tbody className="divide-y divide-slate-200 bg-white">{displayData.map(d=><tr key={d.num} className={d.advice>0?'bg-orange-50':''}><td className="font-bold border-r bg-slate-50">{d.num}</td><td className="text-slate-400">{d.totalBet}</td><td className="text-slate-400">{d.transferred}</td><td className="font-bold">{d.netBet}</td><td className="text-orange-600 font-bold">{d.advice>0?d.advice:'-'}</td><td className="font-bold">{renderPL(d.bankerPL)}</td></tr>)}</tbody> </table> 
+                        </div> 
+                        <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding flex gap-2">
+                            <button onClick={onClose} className="w-16 bg-slate-100 border rounded-xl font-bold btn-press text-slate-500">关闭</button>
+                            {/* 再次复制按钮 */}
+                            {lastHedgingText && (
+                                <button onClick={handleReCopy} className="w-16 bg-orange-100 text-orange-600 border border-orange-200 rounded-xl font-bold btn-press flex items-center justify-center shadow-sm active:scale-95" title="再次复制上次内容">
+                                    <Icon name="RefreshCw" className="w-5 h-5"/>
+                                </button>
+                            )}
+                            <button onClick={copyAndSave} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow flex items-center justify-center gap-2 btn-press"><Icon name="ClipboardCheck" className="w-5 h-5"/> {copyMsg||`复制并保存 (${displayData.filter(d=>d.advice>0).length})`}</button>
+                        </div> 
+                    </div> 
+                </ModalContainer> 
+            ); 
+        };
+
+        const AdminPanel = ({ onClose, db }) => { 
+            const [code, setCode] = useState(''); 
+            const [days, setDays] = useState(30); 
+            const [codes, setCodes] = useState([]); 
+            const [renewTarget, setRenewTarget] = useState(null); 
+            const [renewDays, setRenewDays] = useState(30);
+
+            const fetchCodes = async () => { 
+                if(!db || !window.fb) return; 
+                try { 
+                    const snap = await window.fb.getDocs(window.fb.collection(db, ...window.DB_PATH.getCollectionArgs("access_codes"))); 
+                    setCodes(snap.docs.map(d => ({id: d.id, ...d.data()}))); 
+                } catch(e) { alert("获取数据失败: " + e.message); } 
+            }; 
+            
+            useEffect(() => { fetchCodes(); }, []); 
+            
+            const handleCreate = async () => { 
+                if(!code) return; 
+                if(!db || !window.fb) { alert("数据库未连接"); return; } 
+                const expiry = new Date(); 
+                expiry.setDate(expiry.getDate() + parseInt(days)); 
+                await window.fb.setDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", code)), { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} } }); 
+                alert("访问码 " + code + " 创建成功！"); 
+                fetchCodes(); 
+                setCode(''); 
+            }; 
+
+            const handleRenew = async () => {
+                if (!renewTarget) return;
+                const now = Date.now();
+                const baseTime = renewTarget.expiresAt > now ? renewTarget.expiresAt : now;
+                const newExpiry = baseTime + parseInt(renewDays) * 24 * 60 * 60 * 1000;
+                await window.fb.updateDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", renewTarget.id)), { expiresAt: newExpiry });
+                alert(`用户 ${renewTarget.id} 已成功延期！`);
+                setRenewTarget(null);
+                fetchCodes();
+            };
+            
+            const handleDelete = async (id) => { 
+                if(confirm("确定删除 " + id + " 吗？此操作不可恢复！")) { 
+                    await window.fb.deleteDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id))); 
+                    fetchCodes(); 
+                } 
+            }; 
+            
+            return ( 
+                <div className="fixed inset-0 bg-white z-[5000] p-4 flex flex-col animate-fade-in"> 
+                    <div className="flex justify-between items-center mb-4 border-b pb-2"> 
+                        <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="Lock" className="w-6 h-6"/> 管理员控制台</h2> 
+                        <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6"/></button> 
+                    </div> 
+                    
+                    <div className="mb-6 p-4 bg-indigo-50 rounded-xl space-y-4 shadow-sm border border-indigo-100"> 
+                        <h3 className="font-bold text-indigo-900 flex items-center gap-2"><Icon name="UserPlus" className="w-5 h-5"/> 生成新访问码</h3> 
+                        <div className="flex gap-2"> 
+                            <input value={code} onChange={e=>setCode(e.target.value)} placeholder="设置用户密码 (如: 8888)" className="border p-3 rounded-lg flex-1 outline-none focus:ring-2 focus:ring-indigo-500"/> 
+                            <select value={days} onChange={e=>setDays(e.target.value)} className="border p-3 rounded-lg bg-white outline-none"> 
+                                <option value="1">1天</option> 
+                                <option value="3">3天</option> 
+                                <option value="7">7天</option> 
+                                <option value="30">30天</option> 
+                                <option value="60">2个月</option> 
+                                <option value="90">3个月</option> 
+                                <option value="180">半年</option> 
+                                <option value="365">1年</option> 
+                            </select> 
+                        </div> 
+                        <button onClick={handleCreate} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md btn-press">创建用户账号</button> 
+                    </div> 
+
+                    <div className="flex-1 overflow-y-auto"> 
+                        <h3 className="font-bold mb-3 text-gray-700 px-1">已存在的用户列表</h3> 
+                        {codes.map(c => {
+                            const isExpired = Date.now() > c.expiresAt;
+                            return (
+                                <div key={c.id} className="flex justify-between items-center p-4 border-b bg-white hover:bg-gray-50 transition-colors"> 
+                                    <div> 
+                                        <div className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                                            {c.id}
+                                            {isExpired && <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded">已过期</span>}
+                                        </div> 
+                                        <div className="text-xs text-gray-400 mt-1">有效期至: {new Date(c.expiresAt).toLocaleDateString()}</div> 
+                                    </div> 
+                                    <div className="flex gap-2">
+                                        <button onClick={()=>setRenewTarget(c)} className="text-blue-600 bg-blue-50 px-3 py-2 rounded-lg font-bold text-xs btn-press flex items-center gap-1">
+                                            <Icon name="Calendar" className="w-4 h-4"/> 延期
+                                        </button>
+                                        <button onClick={()=>handleDelete(c.id)} className="text-red-500 bg-red-50 p-2 rounded-lg btn-press"><Icon name="Trash2" className="w-5 h-5"/></button> 
+                                    </div>
+                                </div> 
+                            );
+                        })} 
+                    </div>
+
+                    {renewTarget && (
+                        <div className="fixed inset-0 bg-black/50 z-[6000] flex items-center justify-center p-4 animate-fade-in">
+                            <div className="bg-white w-full max-w-sm rounded-xl p-5 shadow-2xl">
+                                <h3 className="font-bold text-lg mb-4 text-slate-800">为用户 {renewTarget.id} 延期</h3>
+                                <p className="text-xs text-slate-500 mb-4">当前有效期至: {new Date(renewTarget.expiresAt).toLocaleDateString()}</p>
+                                <div className="space-y-2 mb-6">
+                                    <div className="text-sm font-bold text-slate-600">选择延长时间:</div>
+                                    <select value={renewDays} onChange={e=>setRenewDays(e.target.value)} className="w-full border p-3 rounded-lg bg-slate-50 outline-none">
+                                        <option value="1">1天</option>
+                                        <option value="3">3天</option>
+                                        <option value="7">7天</option>
+                                        <option value="30">30天</option>
+                                        <option value="60">2个月</option>
+                                        <option value="90">3个月</option>
+                                        <option value="180">半年</option>
+                                        <option value="365">1年</option>
+                                    </select>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={()=>setRenewTarget(null)} className="flex-1 py-3 border rounded-lg text-slate-500 font-bold btn-press">取消</button>
+                                    <button onClick={handleRenew} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg btn-press">确认延期</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div> 
+            ); 
+        };
+        const LoginScreen = ({ onLogin, onAdmin }) => { 
+            const [code, setCode] = useState(''); 
+            const [loading, setLoading] = useState(false); 
+            
+            const handleLogin = async () => { 
+                if(!code) return; 
+                // Ensure Firebase is ready even for admin
+                if (!window.isFirebaseReady) { 
+                    alert("正在连接云端数据库，请稍等 2-3 秒后重试..."); 
+                    return; 
+                }
+                if(code === 'admin888') { onAdmin(); return; } 
+                setLoading(true); 
+                try { 
+                    // 使用 DB_PATH 辅助函数构建正确的路径
+                    const docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", code)); 
+                    const docSnap = await window.fb.getDoc(docRef); 
+                    if (docSnap.exists()) { 
+                        const data = docSnap.data(); 
+                        if (Date.now() > data.expiresAt) { alert("此访问码已过期，请联系管理员续费。"); } else { onLogin(code, data); } 
+                    } else { alert("访问码不存在，请重试！"); } 
+                } catch(e) { console.error(e); alert("登录出错: " + e.message); } 
+                setLoading(false); 
+            }; 
+            return ( <div className="min-h-screen login-bg flex items-center justify-center p-4"> <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in"> <div className="text-center"> <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner"> <Icon name="Zap" className="w-8 h-8"/> </div> <h1 className="text-2xl font-bold text-gray-800">系统登录</h1> <p className="text-gray-400 text-sm mt-2">请输入管理员提供的访问码</p> </div> <div className="space-y-4"> <input type="text" value={code} onChange={e=>setCode(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none py-4 tracking-widest bg-gray-50 focus:bg-white transition-all text-indigo-900" placeholder="输入访问码" /> <button onClick={handleLogin} disabled={loading} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all btn-press disabled:opacity-50 disabled:cursor-not-allowed"> {loading ? "正在验证..." : "进入系统"} </button> </div> <div className="text-center text-xs text-gray-300 pt-4">v7.16 (终极修复版)</div> </div> </div> ); };
 
         function App() {
             const [userCode, setUserCode] = useState(localStorage.getItem('lottery_user_code') || null);
             const [isAdmin, setIsAdmin] = useState(false);
             const [sessionID, setSessionID] = useState(localStorage.getItem('lottery_session_id') || null);
+            
             const [bets, setBets] = useState([]);
             const [customers, setCustomers] = useState([]);
-            const [transfers, setTransfers] = useState({ hk: {}, mo: {} });
+            const [transfers, setTransfers] = useState({ hk: {}, mo: {} }); // v7.08: Transfer state
             const [currentYearZodiac, setCurrentYearZodiac] = useState('蛇');
+            
             const [inputCustomer, setInputCustomer] = useState(''); const [inputContent, setInputContent] = useState(''); const [defaultAmount, setDefaultAmount] = useState('');
             const [activeTab, setActiveTab] = useState('input'); const [showSettings, setShowSettings] = useState(false); const [showCustomerModal, setShowCustomerModal] = useState(false);
             const [actionSheet, setActionSheet] = useState(null); const [tempCustomers, setTempCustomers] = useState([]); const [batchToEdit, setBatchToEdit] = useState(null);
@@ -444,16 +793,25 @@
             const [expandedReconciliation, setExpandedReconciliation] = useState(null); const [viewingRawBatch, setViewingRawBatch] = useState(null);
             const [previewBatches, setPreviewBatches] = useState([]); const [riskFilter, setRiskFilter] = useState('ALL'); const [bookMode, setBookMode] = useState('ALL'); const [bookTarget, setBookTarget] = useState('');
             const [insertOrderTarget, setInsertOrderTarget] = useState(null);
+            
+            // 新增：自动聚焦的批次ID
             const [focusBatchId, setFocusBatchId] = useState(null);
+
+            // --- 新增：记录最后一次转单内容 ---
             const [lastHedgingText, setLastHedgingText] = useState('');
+            
+            // --- 新增：预览字体大小 ---
             const [previewFontSize, setPreviewFontSize] = useState(14);
 
+            // --- 核心业务逻辑 (直接调用外置函数) ---
             useEffect(() => {
                 const txt = inputContent.trim();
                 if (!txt) { setPreviewBatches([]); return; }
                 const blocks=[]; let curHead='', curLines=[];
                 txt.split('\n').forEach(l => { const isH=/[:：]\s*$/.test(l)&&!new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})[:：]`).test(l); if(isH){if(curLines.length)blocks.push({header:curHead,text:curLines.join('\n')});curHead=l.trim();curLines=[];} else if(l.trim())curLines.push(l); });
                 if(curLines.length) blocks.push({header:curHead,text:curLines.join('\n')});
+                
+                // 直接调用外置的解析函数
                 const previews = blocks.map(b => {
                     const segments = parseContentForSegments(b.text, defaultAmount, currentYearZodiac).filter(s=>s.totalBetCount>0 || s.isSuspicious);
                     const systemTotal = segments.reduce((acc, seg) => acc + (seg.totalBetCount * (seg.isValid&&!seg.isSuspicious?seg.amount:0) * (seg.isDualBet?2:1)), 0);
@@ -463,9 +821,11 @@
                 setPreviewBatches(previews);
             }, [inputContent, defaultAmount, currentYearZodiac]);
 
+            // --- 恢复被遗漏的核心统计逻辑 ---
             const riskStats = useMemo(() => {
                 const hk=Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0})), mo=Array.from({length:49},(_,i)=>({num:i+1,betAmt:0,payout:0}));
                 let [tpH,trH,tpM,trM]=[0,0,0,0];
+                // 风控逻辑修改：过滤掉 isTransferred 为 true 的订单
                 bets.filter(b=>!b.isError && !b.isTransferred).forEach(b => {
                     const c = customers.find(x=>x.name===b.customerName)||{odds:47.5,rebate:0.1}, reb = b.totalAmount*c.rebate;
                     if(b.type==='HK'){tpH+=b.totalAmount;trH+=reb}else{tpM+=b.totalAmount;trM+=reb}
@@ -483,6 +843,7 @@
                     grouped[b.customerName].total += b.totalAmount;
                     grouped[b.customerName].batches[b.batchId].total += b.totalAmount;
                     grouped[b.customerName].batches[b.batchId].records.push(b);
+                    // 只要有一条记录被标记为转出，整个 batch 视为转出 (通常是一起操作的)
                     if(b.isTransferred) grouped[b.customerName].batches[b.batchId].isTransferred = true;
                 });
                 return Object.entries(grouped).map(([name, d]) => ({ name, total: d.total, batches: Object.values(d.batches).sort((a,b) => a.timestamp - b.timestamp) }));
@@ -493,6 +854,7 @@
                 const [wh, wm] = [parseInt(winningNumberHK), parseInt(winningNumberMO)];
                 const stats = [];
                 customers.forEach(cust => {
+                    // 对账逻辑保持不变：即使转出（isTransferred=true）也要显示，用于和客户对账
                     const custBets = bets.filter(b => b.customerName === cust.name && !b.isError);
                     let total = 0, winHK = 0, winMO = 0;
                     const tBatch = {}, processed = new Set();
@@ -540,11 +902,19 @@
                     return `(${b.idx})合计: ${b.total}${lbl}`;
                 }).join('\n');
                 const txt = `【${stat.name}】对账\n----------------\n开奖: 港[${winningNumberHK||'-'}] 澳[${winningNumberMO||'-'}]\n----------------\n本期总投: ¥${stat.totalStake}\n中特本金: ¥${stat.winningStakeTotal}\n退水: ¥${stat.rebateAmt.toFixed(1)}\n----------------\n盈亏: ${stat.profit>=0?'+':''}${stat.profit.toFixed(1)}\n----------------\n${dt}`;
-                const lines = txt.split('\n').length + 3; 
-                const availableHeight = window.innerHeight - 150; 
-                let size = Math.floor(availableHeight / (lines * 1.5)); 
-                if (size > 18) size = 18;
-                if (size < 9) size = 9; 
+                
+                // --- 修复：自动计算字体大小 ---
+                // 计算逻辑：屏幕高度 - 顶部底部留白(约120px) / 行数 / 1.4(行高)
+                const lines = txt.split('\n').length + 2; 
+                const availableHeight = window.innerHeight - 180; 
+                // 确保行数至少为1，避免除以零
+                const safeLines = Math.max(lines, 1);
+                let size = Math.floor(availableHeight / (safeLines * 1.4)); 
+                
+                // 限制范围，防止字体过大或过小
+                if (size > 20) size = 20; // 最大字号
+                if (size < 12) size = 12; // 最小字号，保证清晰度
+
                 setPreviewFontSize(size);
                 setTextPreview({ title: `${stat.name} 对账详单`, content: txt });
             }
@@ -585,8 +955,10 @@
                     });
                     
                     if(newBets.length === 0) return showAlert("没有有效的注单内容", "warning");
+
                     setBets(p => [...p, ...newBets]);
                     setInputContent(''); 
+                    
                     if (firstErrorBatchId) {
                         setBookMode('SINGLE');
                         setBookTarget(inputCustomer);
