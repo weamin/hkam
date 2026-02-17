@@ -3,24 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>订单管理系统 v7.16 (终极稳定版)</title>
+    <title>订单管理系统 v7.16 (春节自动版)</title>
     
-    <!-- 1. 安全卫士 (已激活 - 防白嫖模式) -->
+    <!-- 1. 安全卫士 -->
     <script>
         (function() {
-            // 允许运行的域名白名单
-            const ALLOWED_DOMAINS = [
-                'localhost', 
-                '127.0.0.1', 
-                'firebaseapp.com', 
-                'web.app', 
-                'usercontent', 
-                'google', 
-                'blob:', 
-                'googleusercontent',
-                'github.io'
-            ];
-
+            const ALLOWED_DOMAINS = ['localhost', '127.0.0.1', 'firebaseapp.com', 'web.app', 'usercontent', 'google', 'blob:', 'github.io'];
             function checkDomain() {
                 if (window.location.protocol === 'blob:') return;
                 const current = window.location.hostname;
@@ -46,16 +34,8 @@
         import { getFirestore, initializeFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         
-        // --- Firebase 配置 ---
         const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const fallbackConfig = {
-            apiKey: "AIzaSyBiu3oe1z388azShoVkqZm0IK14kBanlXI",
-            authDomain: "ordersys-5d951.firebaseapp.com",
-            projectId: "ordersys-5d951",
-            storageBucket: "ordersys-5d951.firebasestorage.app",
-            messagingSenderId: "99865299874",
-            appId: "1:99865299874:web:e891e5dcf25e5d6ab5c0fb"
-        };
+        const fallbackConfig = { apiKey: "AIzaSyBiu3oe1z388azShoVkqZm0IK14kBanlXI", authDomain: "ordersys-5d951.firebaseapp.com", projectId: "ordersys-5d951", storageBucket: "ordersys-5d951.firebasestorage.app", messagingSenderId: "99865299874", appId: "1:99865299874:web:e891e5dcf25e5d6ab5c0fb" };
         const firebaseConfig = envConfig || fallbackConfig;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'ordersys-default';
 
@@ -68,30 +48,16 @@
             const app = initializeApp(firebaseConfig);
             const db = initializeFirestore(app, { experimentalForceLongPolling: true });
             const auth = getAuth(app);
-            
             const initAuth = async () => {
                 try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                    window.db = db;
-                    window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc };
-                    window.isFirebaseReady = true;
-                    console.log("System Online (Auth Success)");
-                } catch (err) {
-                    console.warn("Auth/Network Error - Entering Offline Mode", err);
-                    window.db = db;
-                    window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc };
-                    window.isFirebaseReady = true; 
-                }
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
+                    else { await signInAnonymously(auth); }
+                    window.db = db; window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc };
+                    window.isFirebaseReady = true; console.log("System Online");
+                } catch (err) { console.warn("Offline Mode", err); window.db = db; window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc }; window.isFirebaseReady = true; }
             };
             initAuth();
-        } catch (e) {
-            window.isFirebaseReady = false;
-            console.error("Firebase Init Error", e);
-        }
+        } catch (e) { window.isFirebaseReady = false; console.error("Firebase Init Error", e); }
     </script>
 
     <style>
@@ -102,11 +68,8 @@
         #app-modal { position: fixed; inset: 0; z-index: 9999; background-color: rgba(0,0,0,0.5); }
         #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; max-width: 28rem; margin: 0 auto; background: white; }
         .btn-press:active { transform: scale(0.96); opacity: 0.8; }
-        
-        /* 修复：排除 ID 为 preview-text 的 textarea，使其可以动态调整字号 */
         input, select, textarea:not(#preview-text) { font-size: 16px !important; user-select: text !important; } 
         #preview-text { font-size: inherit; }
-
         .compact-table th, .compact-table td { padding: 4px 2px; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
@@ -124,15 +87,7 @@
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
             componentDidCatch(error, errorInfo) { console.error("UI Error:", error, errorInfo); }
             render() {
-                if (this.state.hasError) {
-                    return (
-                        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-red-50 text-red-800">
-                            <h1 className="text-xl font-bold mb-2">系统遇到阻碍</h1>
-                            <div className="bg-white p-2 rounded text-xs mb-4 max-w-full overflow-auto">{this.state.error?.message}</div>
-                            <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-6 py-2 rounded-lg font-bold">重新加载</button>
-                        </div>
-                    );
-                }
+                if (this.state.hasError) return (<div className="min-h-screen flex flex-col items-center justify-center p-4 bg-red-50 text-red-800"><h1 className="text-xl font-bold mb-2">系统遇到阻碍</h1><div className="bg-white p-2 rounded text-xs mb-4 max-w-full overflow-auto">{this.state.error?.message}</div><button onClick={() => window.location.reload()} className="bg-red-600 text-white px-6 py-2 rounded-lg font-bold">重新加载</button></div>);
                 return this.props.children;
             }
         }
@@ -172,7 +127,6 @@
 
         const PATTERN_HK = "香港|香|港"; 
         const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥"; 
-        
         const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：]*[澳门奥])|([澳门奥][\\s.,，;；:：]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(澳门香港)|(香港澳门)");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
         // 修复：移除单独的 "个" 作为金额前缀
@@ -182,22 +136,30 @@
         const REGEX_CHAT_HEADER = /^.*[:：]\s*$/;
         const REGEX_CLIENT_TOTAL = /(?:[，,。;；]\s*)?(?:[（(]\s*)?(?:合计|总计|一共|打包)\s*[:：]?\s*\d+(?:\.\d+)?(?:\s*[元])?(?:\s*[)）])?/gi;
 
-        // --- 新增：农历春节配置表 ---
+        // --- 修复：增强的农历春节配置表 (月份为实际月份，非索引) ---
         const LUNAR_CALENDAR = [
-            { date: '2025-01-29', zodiac: '蛇' },
-            { date: '2026-02-17', zodiac: '马' },
-            { date: '2027-02-06', zodiac: '羊' },
-            { date: '2028-01-26', zodiac: '猴' },
-            { date: '2029-02-13', zodiac: '鸡' }
+            { y: 2025, m: 1, d: 29, z: '蛇' }, // 2025-01-29
+            { y: 2026, m: 2, d: 17, z: '马' }, // 2026-02-17
+            { y: 2027, m: 2, d: 6, z: '羊' },  // 2027-02-06
+            { y: 2028, m: 1, d: 26, z: '猴' }, // 2028-01-26
+            { y: 2029, m: 2, d: 13, z: '鸡' }  // 2029-02-13
         ];
 
-        // --- 新增：自动获取当前生肖 ---
+        // --- 修复：自动获取当前生肖 (修正日期比较逻辑) ---
         const getAutoZodiac = () => {
             const now = new Date();
-            // 找到最后一个“开始日期 <= 今天”的年份
-            // slice().reverse() 确保我们找到的是最近过去的一个春节
-            const current = LUNAR_CALENDAR.slice().reverse().find(c => now >= new Date(c.date));
-            return current ? current.zodiac : '蛇'; // 默认回退
+            // 将当前时间设为 00:00:00 以进行纯日期比较
+            now.setHours(0,0,0,0);
+            
+            // 按时间倒序遍历，找到第一个“开始日期 <= 今天”的年份
+            // 例如今天是 2026-02-18，会匹配到 2026-02-17 (马)
+            // 如果今天是 2026-01-01，不匹配马，继续找，匹配到 2025-01-29 (蛇)
+            const current = LUNAR_CALENDAR.slice().reverse().find(c => {
+                const cnyDate = new Date(c.y, c.m - 1, c.d); // Month is 0-indexed in Date constructor
+                return now >= cnyDate;
+            });
+            
+            return current ? current.z : '蛇'; // 默认回退到蛇
         };
 
         const parseChineseNumber = (s) => { const map={'零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000}; if(s.length===1 && map[s]!==undefined && map[s]<10) return map[s]; let res=0, curr=0; for(let i=0;i<s.length;i++){ const val=map[s[i]]; if(val>=10){ if(curr===0)curr=1; res+=curr*val; curr=0; } else if(val!==undefined) curr=val; } return (res+curr)||NaN; };
@@ -707,6 +669,7 @@
                         </div> 
                         <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding flex gap-2">
                             <button onClick={onClose} className="w-16 bg-slate-100 border rounded-xl font-bold btn-press text-slate-500">关闭</button>
+                            {/* 再次复制按钮 */}
                             {lastHedgingText && (
                                 <button onClick={handleReCopy} className="w-16 bg-orange-100 text-orange-600 border border-orange-200 rounded-xl font-bold btn-press flex items-center justify-center shadow-sm active:scale-95" title="再次复制上次内容">
                                     <Icon name="RefreshCw" className="w-5 h-5"/>
@@ -727,15 +690,9 @@
             const [renewDays, setRenewDays] = useState(30);
 
             const fetchCodes = async () => { 
-                if(!window.fb) return; 
+                if(!db || !window.fb) return; 
                 try { 
-                    let colRef;
-                    if (window.isLocalMode) {
-                        colRef = window.fb.collection("LOCAL", "access_codes");
-                    } else {
-                        colRef = window.fb.collection(db, ...window.DB_PATH.getCollectionArgs("access_codes"));
-                    }
-                    const snap = await window.fb.getDocs(colRef); 
+                    const snap = await window.fb.getDocs(window.fb.collection(db, ...window.DB_PATH.getCollectionArgs("access_codes"))); 
                     setCodes(snap.docs.map(d => ({id: d.id, ...d.data()}))); 
                 } catch(e) { alert("获取数据失败: " + e.message); } 
             }; 
@@ -744,17 +701,10 @@
             
             const handleCreate = async () => { 
                 if(!code) return; 
+                if(!db || !window.fb) { alert("数据库未连接"); return; } 
                 const expiry = new Date(); 
                 expiry.setDate(expiry.getDate() + parseInt(days)); 
-                
-                let docRef;
-                if (window.isLocalMode) {
-                    docRef = window.fb.doc("LOCAL", "access_codes", code);
-                } else {
-                    docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", code));
-                }
-                
-                await window.fb.setDoc(docRef, { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} } }); 
+                await window.fb.setDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", code)), { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} } }); 
                 alert("访问码 " + code + " 创建成功！"); 
                 fetchCodes(); 
                 setCode(''); 
@@ -765,16 +715,7 @@
                 const now = Date.now();
                 const baseTime = renewTarget.expiresAt > now ? renewTarget.expiresAt : now;
                 const newExpiry = baseTime + parseInt(renewDays) * 24 * 60 * 60 * 1000;
-                
-                let docRef;
-                if (window.isLocalMode) {
-                    docRef = window.fb.doc("LOCAL", "access_codes", renewTarget.id);
-                } else {
-                    docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", renewTarget.id));
-                }
-
-                await window.fb.updateDoc(docRef, { expiresAt: newExpiry });
-                
+                await window.fb.updateDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", renewTarget.id)), { expiresAt: newExpiry });
                 alert(`用户 ${renewTarget.id} 已成功延期！`);
                 setRenewTarget(null);
                 fetchCodes();
@@ -782,13 +723,7 @@
             
             const handleDelete = async (id) => { 
                 if(confirm("确定删除 " + id + " 吗？此操作不可恢复！")) { 
-                    let docRef;
-                    if (window.isLocalMode) {
-                        docRef = window.fb.doc("LOCAL", "access_codes", id);
-                    } else {
-                        docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id));
-                    }
-                    await window.fb.deleteDoc(docRef); 
+                    await window.fb.deleteDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id))); 
                     fetchCodes(); 
                 } 
             }; 
@@ -796,7 +731,7 @@
             return ( 
                 <div className="fixed inset-0 bg-white z-[5000] p-4 flex flex-col animate-fade-in"> 
                     <div className="flex justify-between items-center mb-4 border-b pb-2"> 
-                        <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="Lock" className="w-6 h-6"/> 管理员控制台 {window.isLocalMode && <span className="text-xs bg-orange-100 text-orange-600 px-2 rounded">本地模式</span>}</h2> 
+                        <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="Lock" className="w-6 h-6"/> 管理员控制台</h2> 
                         <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6"/></button> 
                     </div> 
                     
@@ -876,20 +811,7 @@
             
             const handleLogin = async () => { 
                 if(!code) return; 
-                if (window.isLocalMode) {
-                   if(code === 'admin888') { onAdmin(); return; }
-                   setLoading(true);
-                   try {
-                       const docRef = window.fb.doc("LOCAL", "access_codes", code);
-                       const docSnap = await window.fb.getDoc(docRef);
-                       if (docSnap.exists()) {
-                           const data = docSnap.data();
-                           if (Date.now() > data.expiresAt) { alert("此访问码已过期，请联系管理员续费。"); } else { onLogin(code, data); }
-                       } else { alert("访问码不存在（本地）！"); }
-                   } catch(e) { console.error(e); alert("本地存储错误"); }
-                   setLoading(false);
-                   return;
-                }
+                // Ensure Firebase is ready even for admin
                 if (!window.isFirebaseReady) { 
                     alert("正在连接云端数据库，请稍等 2-3 秒后重试..."); 
                     return; 
@@ -897,6 +819,7 @@
                 if(code === 'admin888') { onAdmin(); return; } 
                 setLoading(true); 
                 try { 
+                    // 使用 DB_PATH 辅助函数构建正确的路径
                     const docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", code)); 
                     const docSnap = await window.fb.getDoc(docRef); 
                     if (docSnap.exists()) { 
@@ -906,20 +829,7 @@
                 } catch(e) { console.error(e); alert("登录出错: " + e.message); } 
                 setLoading(false); 
             }; 
-            return ( <div className="min-h-screen login-bg flex items-center justify-center p-4"> <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in relative overflow-hidden"> 
-                <div className={`absolute top-0 left-0 w-full h-1 ${window.isLocalMode ? 'bg-orange-400' : 'bg-green-500'}`}></div>
-                <div className="absolute top-2 right-2 text-[10px] text-gray-400 font-mono">
-                    {window.isLocalMode ? 'LOCAL MODE' : 'CLOUD MODE'}
-                </div>
-                <div className="text-center"> <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner"> <Icon name="Zap" className="w-8 h-8"/> </div> <h1 className="text-2xl font-bold text-gray-800">系统登录</h1> <p className="text-gray-400 text-sm mt-2">请输入管理员提供的访问码</p> </div> 
-                <div className="space-y-4"> <input type="text" value={code} onChange={e=>setCode(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none py-4 tracking-widest bg-gray-50 focus:bg-white transition-all text-indigo-900" placeholder="输入访问码" /> <button onClick={handleLogin} disabled={loading} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all btn-press disabled:opacity-50 disabled:cursor-not-allowed"> {loading ? "正在验证..." : "进入系统"} </button> </div> 
-                <div className="text-center space-y-2">
-                    <div className="text-xs text-gray-300">v7.16 (终极稳定版)</div>
-                    {!window.isLocalMode && ( <button onClick={window.forceLocalMode} className="text-[10px] text-orange-400 underline opacity-70 hover:opacity-100">连接失败？切换到本地离线模式</button> )}
-                    {window.isLocalMode && ( <button onClick={window.retryCloudConnection} className="text-[10px] text-blue-500 underline opacity-70 hover:opacity-100">重试连接云端</button> )}
-                </div>
-            </div> </div> ); 
-        };
+            return ( <div className="min-h-screen login-bg flex items-center justify-center p-4"> <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in"> <div className="text-center"> <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner"> <Icon name="Zap" className="w-8 h-8"/> </div> <h1 className="text-2xl font-bold text-gray-800">系统登录</h1> <p className="text-gray-400 text-sm mt-2">请输入管理员提供的访问码</p> </div> <div className="space-y-4"> <input type="text" value={code} onChange={e=>setCode(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none py-4 tracking-widest bg-gray-50 focus:bg-white transition-all text-indigo-900" placeholder="输入访问码" /> <button onClick={handleLogin} disabled={loading} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all btn-press disabled:opacity-50 disabled:cursor-not-allowed"> {loading ? "正在验证..." : "进入系统"} </button> </div> <div className="text-center text-xs text-gray-300 pt-4">v7.16 (终极稳定版)</div> </div> </div> ); };
 
         function App() {
             const [userCode, setUserCode] = useState(localStorage.getItem('lottery_user_code') || null);
@@ -930,7 +840,9 @@
             const [bets, setBets] = useState([]);
             const [customers, setCustomers] = useState([]);
             const [transfers, setTransfers] = useState({ hk: {}, mo: {} });
-            const [currentYearZodiac, setCurrentYearZodiac] = useState('蛇');
+            
+            // --- 修复：状态初始化时直接调用函数获取正确生肖 ---
+            const [currentYearZodiac, setCurrentYearZodiac] = useState(getAutoZodiac());
             
             const [inputCustomer, setInputCustomer] = useState(''); const [inputContent, setInputContent] = useState(''); const [defaultAmount, setDefaultAmount] = useState('');
             const [activeTab, setActiveTab] = useState('input'); const [showSettings, setShowSettings] = useState(false); const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -1038,6 +950,7 @@
                 }).join('\n');
                 const txt = `【${stat.name}】对账\n----------------\n开奖: 港[${winningNumberHK||'-'}] 澳[${winningNumberMO||'-'}]\n----------------\n本期总投: ¥${stat.totalStake}\n中特本金: ¥${stat.winningStakeTotal}\n退水: ¥${stat.rebateAmt.toFixed(1)}\n----------------\n盈亏: ${stat.profit>=0?'+':''}${stat.profit.toFixed(1)}\n----------------\n${dt}`;
                 
+                // --- 修复：自动计算字体大小 ---
                 const lines = txt.split('\n').length + 3; 
                 const availableHeight = window.innerHeight - 150; 
                 let size = Math.floor(availableHeight / (lines * 1.5)); 
@@ -1258,21 +1171,26 @@
             useEffect(() => { if(showSettings) setTempCustomers(customers || []); }, [showSettings, customers]);
             useEffect(() => { if (inputCustomer) { setBookTarget(inputCustomer); setBookMode('SINGLE'); } }, [inputCustomer]);
 
+            // --- 新增：自动滚动到异常订单 ---
             useEffect(() => {
                 if (activeTab === 'customers' && focusBatchId) {
                     setTimeout(() => {
                         const el = document.getElementById(`batch-${focusBatchId}`);
                         if (el) {
                             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // 闪烁高亮效果
                             el.classList.add('ring-4', 'ring-red-400', 'ring-offset-2', 'transition-all', 'duration-500');
                             setTimeout(() => el.classList.remove('ring-4', 'ring-red-400', 'ring-offset-2'), 2500);
                         }
-                    }, 300); 
+                    }, 300); // 稍微延迟以等待渲染
+                    
+                    // 滚动完成后清除 focusBatchId，防止重复触发
                     const timer = setTimeout(() => setFocusBatchId(null), 1000);
                     return () => clearTimeout(timer);
                 }
             }, [activeTab, focusBatchId, displayedCustomerStats]);
 
+            // 移动到 render 之前计算
             const errorCount = useMemo(() => bets.filter(b => b.isError).map(b => b.batchId).filter((v, i, a) => a.indexOf(v) === i).length, [bets]);
 
             if (!userCode && !isAdmin) return <ErrorBoundary><LoginScreen onLogin={handleLoginSuccess} onAdmin={()=>setIsAdmin(true)} /></ErrorBoundary>;
@@ -1282,7 +1200,7 @@
                 <ErrorBoundary>
                     <div className="max-w-md mx-auto min-h-screen bg-gray-50 flex flex-col">
                         <div id="app-header" className="bg-indigo-600 text-white p-4 shadow-lg flex justify-between items-center">
-                            <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5 text-yellow-300"/> 订单管理系统 v7.16 ({userCode})</div>
+                            <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5 text-yellow-300"/> 订单管理系统 v7.16 ({currentYearZodiac}年)</div>
                             <div className="flex gap-2">
                                 <button onClick={()=>setShowSettings(true)} className="bg-white/20 px-2 py-1 rounded text-xs font-bold btn-press">客户</button>
                                 <button onClick={handleLogout} className="bg-red-500/80 px-2 py-1 rounded text-xs font-bold btn-press">退出</button>
