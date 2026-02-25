@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>订单管理系统 v7.16 (春节自动版)</title>
+    <title>订单管理系统 v7.16 (终极稳定版)</title>
     
     <!-- 1. 安全卫士 -->
     <script>
@@ -106,18 +106,19 @@
             const k = {};
             const odds=ALL_NUMBERS.filter(isOdd), evens=ALL_NUMBERS.filter(isEven);
             k['单数']=odds; k['单']=odds; k['双数']=evens; k['双']=evens;
-            // 新增：大小数规则
             k['小数']=ALL_NUMBERS.filter(isSmall); k['小']=ALL_NUMBERS.filter(isSmall);
             k['大数']=ALL_NUMBERS.filter(isBig); k['大']=ALL_NUMBERS.filter(isBig);
-
-            // 新增：大小尾规则
             k['大尾']=ALL_NUMBERS.filter(n=>[5,6,7,8,9].includes(n%10));
             k['小尾']=ALL_NUMBERS.filter(n=>[0,1,2,3,4].includes(n%10));
-            
             k['小单']=ALL_NUMBERS.filter(n=>isSmall(n)&&isOdd(n)); k['小双']=ALL_NUMBERS.filter(n=>isSmall(n)&&isEven(n));
             k['大单']=ALL_NUMBERS.filter(n=>isBig(n)&&isOdd(n)); k['大双']=ALL_NUMBERS.filter(n=>isBig(n)&&isEven(n));
             k['合数单']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2!==0); k['合单']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2!==0);
             k['合数双']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2===0); k['合双']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2===0);
+            
+            // 修复：添加大小双/大小单的同义词别名
+            k['小数双'] = k['小双']; k['大数双'] = k['大双'];
+            k['小数单'] = k['小单']; k['大数单'] = k['大单'];
+
             k['红波']=WAVES.RED; k['红']=WAVES.RED; k['蓝波']=WAVES.BLUE; k['蓝']=WAVES.BLUE; k['绿波']=WAVES.GREEN; k['绿']=WAVES.GREEN;
             const rO=WAVES.RED.filter(isOdd), rE=WAVES.RED.filter(isEven); const bO=WAVES.BLUE.filter(isOdd), bE=WAVES.BLUE.filter(isEven); const gO=WAVES.GREEN.filter(isOdd), gE=WAVES.GREEN.filter(isEven);
             k['红单']=rO; k['红波单']=rO; k['红双']=rE; k['红波双']=rE; k['蓝单']=bO; k['蓝波单']=bO; k['蓝双']=bE; k['蓝波双']=bE; k['绿单']=gO; k['绿波单']=gO; k['绿双']=gE; k['绿波双']=gE;
@@ -129,37 +130,29 @@
         const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥"; 
         const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：]*[澳门奥])|([澳门奥][\\s.,，;；:：]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(澳门香港)|(香港澳门)");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
-        // 修复：移除单独的 "个" 作为金额前缀
+        // 移除单独的 "个" 作为金额前缀
         const BASE_AMOUNT_PARTS = [`((每个号各|每个号|每号各|每个|每号|个号|各|买|x|X|号|=|每)[\\s.．。、…~＇']*\\d+(\\.\\d+)?[\\s.．。、…~＇']*[${UNITS}]?)`, `(\\d+(\\.\\d+)?[\\s.．。、…~＇']*[${UNITS}])`, `(\\d+(\\.\\d+)?x)`, `((每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。、…~＇']*[${CH_NUM}]+[\\s.．。、…~＇']*[${UNITS}]?)`, `([${CH_NUM}]+[\\s.．。、…~＇']*[${UNITS}])`, `((?<=[\\d\\s])[${CH_NUM}]+(?!([岁尾头])))`, `(?<=[号])\\d+(\\.\\d+)?`].join("|");
         const REGEX_AMOUNT_NO_SLASH = new RegExp(BASE_AMOUNT_PARTS, 'gi');
         const REGEX_AMOUNT_WITH_SLASH = new RegExp(`${BASE_AMOUNT_PARTS}|(\\/[\\s.．。…~＇']*\\d+(\\.\\d+)?\\s*[${UNITS}]?)`, 'gi');
         const REGEX_CHAT_HEADER = /^.*[:：]\s*$/;
         const REGEX_CLIENT_TOTAL = /(?:[，,。;；]\s*)?(?:[（(]\s*)?(?:合计|总计|一共|打包)\s*[:：]?\s*\d+(?:\.\d+)?(?:\s*[元])?(?:\s*[)）])?/gi;
 
-        // --- 修复：增强的农历春节配置表 (月份为实际月份，非索引) ---
         const LUNAR_CALENDAR = [
-            { y: 2025, m: 1, d: 29, z: '蛇' }, // 2025-01-29
-            { y: 2026, m: 2, d: 17, z: '马' }, // 2026-02-17
-            { y: 2027, m: 2, d: 6, z: '羊' },  // 2027-02-06
-            { y: 2028, m: 1, d: 26, z: '猴' }, // 2028-01-26
-            { y: 2029, m: 2, d: 13, z: '鸡' }  // 2029-02-13
+            { y: 2025, m: 1, d: 29, z: '蛇' }, 
+            { y: 2026, m: 2, d: 17, z: '马' }, 
+            { y: 2027, m: 2, d: 6, z: '羊' },  
+            { y: 2028, m: 1, d: 26, z: '猴' }, 
+            { y: 2029, m: 2, d: 13, z: '鸡' }  
         ];
 
-        // --- 修复：自动获取当前生肖 (修正日期比较逻辑) ---
         const getAutoZodiac = () => {
             const now = new Date();
-            // 将当前时间设为 00:00:00 以进行纯日期比较
             now.setHours(0,0,0,0);
-            
-            // 按时间倒序遍历，找到第一个“开始日期 <= 今天”的年份
-            // 例如今天是 2026-02-18，会匹配到 2026-02-17 (马)
-            // 如果今天是 2026-01-01，不匹配马，继续找，匹配到 2025-01-29 (蛇)
             const current = LUNAR_CALENDAR.slice().reverse().find(c => {
-                const cnyDate = new Date(c.y, c.m - 1, c.d); // Month is 0-indexed in Date constructor
+                const cnyDate = new Date(c.y, c.m - 1, c.d);
                 return now >= cnyDate;
             });
-            
-            return current ? current.z : '蛇'; // 默认回退到蛇
+            return current ? current.z : '蛇';
         };
 
         const parseChineseNumber = (s) => { const map={'零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000}; if(s.length===1 && map[s]!==undefined && map[s]<10) return map[s]; let res=0, curr=0; for(let i=0;i<s.length;i++){ const val=map[s[i]]; if(val>=10){ if(curr===0)curr=1; res+=curr*val; curr=0; } else if(val!==undefined) curr=val; } return (res+curr)||NaN; };
@@ -199,11 +192,9 @@
             txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/(\d+)\s*[.,，;；*]+\s*(?:各)?\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
             txt = txt.replace(/(\d+)[.．。…~＇' -]*\s*到\s*[.．。…~＇' -]*(\d+)/g, (m,s,e) => { const n1=parseInt(s),n2=parseInt(e); return (n1<n2&&n2-n1<49) ? Array.from({length:n2-n1+1},(_,i)=>n1+i).join(' ') : m; });
             
-            // 修复：倒序回溯检查，防止错误连坐
             txt = txt.replace(new RegExp(`((?:\\d+[\\s.,，;；、*\\/。．…~＇' -]+)+\\d+)[\\s.,，;；、*\\/。．…~＇' -]*(?:各)?\\s*(岁|尾|头)`, 'g'), (m,n,s)=> {
                 const parts = n.split(/([^\d]+)/).filter(x=>x); 
                 const tokens = [];
-                // Flatten and extract only numbers
                 let numbers = [];
                 parts.forEach(p => {
                    if (/\d+/.test(p)) {
@@ -214,9 +205,7 @@
                    }
                 });
 
-                // Check from end
                 let applySuffix = true;
-                
                 for (let i = tokens.length - 1; i >= 0; i--) {
                     if (tokens[i].type === 'num') {
                         const val = tokens[i].val;
@@ -236,33 +225,59 @@
             });
             
             txt = txt.replace(/(\d+)\s+(岁|尾|头)/g, '$1$2');
-
             txt = txt.replace(/(\d{2,})\s*(尾|头)/g, (m, digits, suffix) => digits.split('').map(d => d + suffix).join(' '));
-
             txt = txt.replace(new RegExp(`([${ZODIAC_LIST.join('')}])`,'g'), ' $1 ');
             
-            txt = txt.replace(/[.,，;；、\/\-*\—–−+。：:…~＇'．Tt特]/g, ' ').replace(/[*]/g, ' ');
+            // --- 修复关键：增加过滤冗余汉字（各买个元块钱连碰拖），防止它们被错认为独立的不合法指令 ---
+            txt = txt.replace(/[.,，;；、\/\-*\—–−+。：:…~＇'．Tt特各买个元块钱连碰拖]/g, ' ');
             
             const hasSuspiciousTen = /([尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])\s*十|十\s*(\d+[尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])/.test(txt);
             let hasUnknown = false;
+            
             txt.split(/\s+/).map(t=>t.replace(REGEX_AMOUNT_WITH_SLASH,'').trim()).filter(t=>t&&!t.includes('(XXF)')&&!t.match(/^\d{11}$/)).forEach(t => {
-                const heMatch = t.match(/^合(?:数)?(\d+)$/); if(heMatch) { const v=parseInt(heMatch[1]); if(!isNaN(v)) for(let i=1;i<=49;i++) if(Math.floor(i/10)+(i%10)===v){nums.push(i);count++} return; }
-                let n = parseInt(t);
-                if (isNaN(n)) { const m = t.match(/^(\d+)/); if(m){ n=parseInt(m[1]); hasUnknown=true; } else if(!KEYWORDS[t]&&!ZODIAC_LIST.includes(t)&&!/^[岁尾头]$/.test(t.slice(-1))) hasUnknown=true; }
-                if (!isNaN(n) && n>=1 && n<=49 && !/^[岁尾头]$/.test(t.slice(-1))) { nums.push(n); count++; return; }
+                const heMatch = t.match(/^合(?:数)?(\d+)$/); 
+                if(heMatch) { const v=parseInt(heMatch[1]); if(!isNaN(v)) for(let i=1;i<=49;i++) if(Math.floor(i/10)+(i%10)===v){nums.push(i);count++} return; }
+                
                 if (KEYWORDS[t]) { KEYWORDS[t].forEach(x=>nums.push(x)); count+=KEYWORDS[t].length; return; }
                 if (ZODIAC_LIST.includes(t)) { getNumbersForZodiac(t, currentYearZodiac).forEach(x=>nums.push(x)); count+=getNumbersForZodiac(t, currentYearZodiac).length; return; }
                 
-                if (t.endsWith('岁')) { 
+                let isPureNum = /^\d+$/.test(t);
+                let isAge = /^\d+岁$/.test(t);
+                let isTailHead = /^\d+[尾头]$/.test(t);
+                
+                if (isPureNum) {
+                    let n = parseInt(t);
+                    if (n>=1 && n<=49) { nums.push(n); count++; } else { hasUnknown = true; }
+                    return;
+                }
+                
+                if (isAge) {
                     const a=parseInt(t); 
-                    if(!isNaN(a)) {
-                        if (a < 1 || a > 12) { hasUnknown = true; } else { for(let x=a;x<=49;x+=12) if(x>0){nums.push(x);count++} }
-                    }
+                    if(a >= 1 && a <= 12) { for(let x=a;x<=49;x+=12) if(x>0){nums.push(x);count++} } 
+                    else { hasUnknown = true; }
                     return; 
                 }
 
-                if (t.endsWith('尾')||t.endsWith('头')) { const v=parseInt(t); if(!isNaN(v)) { const isT=t.endsWith('尾'); for(let i=(isT?1:0);i<=49;i++) if(i>0 && (isT?i%10===v:Math.floor(i/10)===v)){nums.push(i);count++} } return; }
-                if (!isNaN(n) && (n<1 || n>49)) hasUnknown=true;
+                if (isTailHead) {
+                    const v=parseInt(t); 
+                    if (v >= 0 && v <= 9) {
+                        const isT=t.endsWith('尾'); 
+                        if (!isT && v > 4) { hasUnknown = true; return; } // 头数0-4
+                        for(let i=(isT?1:0);i<=49;i++) if(i>0 && (isT?i%10===v:Math.floor(i/10)===v)){nums.push(i);count++}
+                    } else {
+                        hasUnknown = true;
+                    }
+                    return;
+                }
+                
+                // --- 修复关键：如果走到这里，说明夹杂了无法识别的乱码(如: 10安)。
+                // 虽然尝试提取前置数字，但必须标记 hasUnknown 为 true，触发系统标红警告。
+                const m = t.match(/^(\d+)/);
+                if (m) {
+                    let n = parseInt(m[1]);
+                    if (n>=1 && n<=49) { nums.push(n); count++; }
+                }
+                hasUnknown = true;
             });
             return { numbers: nums.sort((a,b)=>a-b), totalBetCount: count, type, hasUnknown: hasUnknown||hasSuspiciousTen };
         };
@@ -285,10 +300,8 @@
 
                 let processedLine = line.replace(/(\d)个/g, '$1 '); // Fix: 15个2 -> 15 2
                 
-                // 1. "奥香" in middle (Split into two lines)
                 processedLine = processedLine.replace(/([\d元块遍岁尾头][\s.,，;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)\s*(?=(?:香港|香|港))/g, '$1$2\n');
                 processedLine = processedLine.replace(/([\d元块遍岁尾头][\s.,，;；]*)(香港|香|港)\s*(?=(?:[奥澳][门]?|[新老]?[澳奥]门|噢T|溴T))/g, '$1$2\n');
-
                 processedLine = processedLine.replace(/([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)\s*[.,，;；\s]+\s*(?=(?:香港|香|港))/g, '$1\n');
                 processedLine = processedLine.replace(/(香港|香|港)\s*[.,，;；\s]+\s*(?=(?:[奥澳][门]?|[新老]?[澳奥]门|噢T|溴T))/g, '$1\n');
                 processedLine = processedLine.replace(/((?:每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)\s*[\d零一二三四五六七八九十百千]+(?:[\.]\d+)?[元米斤块]?)\s*[，,;；]\s*/g, '$1\n');
@@ -570,18 +583,14 @@
             }, [data, maxBetLimit, rawTotalPool]); 
             
             useEffect(() => { 
-                // 新逻辑: 寻找满足 |MaxLoss| <= MaxWin 的最大 limit
                 const netBets = data.map(d => d.netBet);
                 if (netBets.length === 0) return;
                 
                 const maxVal = Math.max(...netBets);
                 
-                // 二分查找最佳 Limit
                 let low = 0, high = maxVal, ans = 0;
                 while(low <= high) {
                     const mid = Math.floor((low + high) / 2);
-                    
-                    // 计算模拟数据
                     let simPool = 0;
                     let simMaxH = 0;
                     let simMinH = Infinity;
@@ -597,7 +606,6 @@
                     const simMaxLoss = simPool - simMaxH * 48;
                     const simMaxWin = simPool - simMinH * 48;
                     
-                    // 核心判断标准：最大赔的绝对值 <= 最大赢
                     if (Math.abs(simMaxLoss) <= simMaxWin) {
                         ans = mid;
                         low = mid + 1;
@@ -669,7 +677,6 @@
                         </div> 
                         <div className="p-3 border-t bg-white shrink-0 safe-bottom-padding flex gap-2">
                             <button onClick={onClose} className="w-16 bg-slate-100 border rounded-xl font-bold btn-press text-slate-500">关闭</button>
-                            {/* 再次复制按钮 */}
                             {lastHedgingText && (
                                 <button onClick={handleReCopy} className="w-16 bg-orange-100 text-orange-600 border border-orange-200 rounded-xl font-bold btn-press flex items-center justify-center shadow-sm active:scale-95" title="再次复制上次内容">
                                     <Icon name="RefreshCw" className="w-5 h-5"/>
@@ -692,7 +699,13 @@
             const fetchCodes = async () => { 
                 if(!db || !window.fb) return; 
                 try { 
-                    const snap = await window.fb.getDocs(window.fb.collection(db, ...window.DB_PATH.getCollectionArgs("access_codes"))); 
+                    let colRef;
+                    if (window.isLocalMode) {
+                        colRef = window.fb.collection("LOCAL", "access_codes");
+                    } else {
+                        colRef = window.fb.collection(db, ...window.DB_PATH.getCollectionArgs("access_codes"));
+                    }
+                    const snap = await window.fb.getDocs(colRef); 
                     setCodes(snap.docs.map(d => ({id: d.id, ...d.data()}))); 
                 } catch(e) { alert("获取数据失败: " + e.message); } 
             }; 
@@ -704,7 +717,15 @@
                 if(!db || !window.fb) { alert("数据库未连接"); return; } 
                 const expiry = new Date(); 
                 expiry.setDate(expiry.getDate() + parseInt(days)); 
-                await window.fb.setDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", code)), { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} } }); 
+                
+                let docRef;
+                if (window.isLocalMode) {
+                    docRef = window.fb.doc("LOCAL", "access_codes", code);
+                } else {
+                    docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", code));
+                }
+                
+                await window.fb.setDoc(docRef, { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} } }); 
                 alert("访问码 " + code + " 创建成功！"); 
                 fetchCodes(); 
                 setCode(''); 
@@ -715,7 +736,16 @@
                 const now = Date.now();
                 const baseTime = renewTarget.expiresAt > now ? renewTarget.expiresAt : now;
                 const newExpiry = baseTime + parseInt(renewDays) * 24 * 60 * 60 * 1000;
-                await window.fb.updateDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", renewTarget.id)), { expiresAt: newExpiry });
+                
+                let docRef;
+                if (window.isLocalMode) {
+                    docRef = window.fb.doc("LOCAL", "access_codes", renewTarget.id);
+                } else {
+                    docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", renewTarget.id));
+                }
+
+                await window.fb.updateDoc(docRef, { expiresAt: newExpiry });
+                
                 alert(`用户 ${renewTarget.id} 已成功延期！`);
                 setRenewTarget(null);
                 fetchCodes();
@@ -723,7 +753,13 @@
             
             const handleDelete = async (id) => { 
                 if(confirm("确定删除 " + id + " 吗？此操作不可恢复！")) { 
-                    await window.fb.deleteDoc(window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id))); 
+                    let docRef;
+                    if (window.isLocalMode) {
+                        docRef = window.fb.doc("LOCAL", "access_codes", id);
+                    } else {
+                        docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id));
+                    }
+                    await window.fb.deleteDoc(docRef); 
                     fetchCodes(); 
                 } 
             }; 
@@ -731,7 +767,7 @@
             return ( 
                 <div className="fixed inset-0 bg-white z-[5000] p-4 flex flex-col animate-fade-in"> 
                     <div className="flex justify-between items-center mb-4 border-b pb-2"> 
-                        <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="Lock" className="w-6 h-6"/> 管理员控制台</h2> 
+                        <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="Lock" className="w-6 h-6"/> 管理员控制台 {window.isLocalMode && <span className="text-xs bg-orange-100 text-orange-600 px-2 rounded">本地模式</span>}</h2> 
                         <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6"/></button> 
                     </div> 
                     
@@ -811,7 +847,20 @@
             
             const handleLogin = async () => { 
                 if(!code) return; 
-                // Ensure Firebase is ready even for admin
+                if (window.isLocalMode) {
+                   if(code === 'admin888') { onAdmin(); return; }
+                   setLoading(true);
+                   try {
+                       const docRef = window.fb.doc("LOCAL", "access_codes", code);
+                       const docSnap = await window.fb.getDoc(docRef);
+                       if (docSnap.exists()) {
+                           const data = docSnap.data();
+                           if (Date.now() > data.expiresAt) { alert("此访问码已过期，请联系管理员续费。"); } else { onLogin(code, data); }
+                       } else { alert("访问码不存在（本地）！"); }
+                   } catch(e) { console.error(e); alert("本地存储错误"); }
+                   setLoading(false);
+                   return;
+                }
                 if (!window.isFirebaseReady) { 
                     alert("正在连接云端数据库，请稍等 2-3 秒后重试..."); 
                     return; 
@@ -819,7 +868,6 @@
                 if(code === 'admin888') { onAdmin(); return; } 
                 setLoading(true); 
                 try { 
-                    // 使用 DB_PATH 辅助函数构建正确的路径
                     const docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", code)); 
                     const docSnap = await window.fb.getDoc(docRef); 
                     if (docSnap.exists()) { 
@@ -829,7 +877,20 @@
                 } catch(e) { console.error(e); alert("登录出错: " + e.message); } 
                 setLoading(false); 
             }; 
-            return ( <div className="min-h-screen login-bg flex items-center justify-center p-4"> <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in"> <div className="text-center"> <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner"> <Icon name="Zap" className="w-8 h-8"/> </div> <h1 className="text-2xl font-bold text-gray-800">系统登录</h1> <p className="text-gray-400 text-sm mt-2">请输入管理员提供的访问码</p> </div> <div className="space-y-4"> <input type="text" value={code} onChange={e=>setCode(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none py-4 tracking-widest bg-gray-50 focus:bg-white transition-all text-indigo-900" placeholder="输入访问码" /> <button onClick={handleLogin} disabled={loading} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all btn-press disabled:opacity-50 disabled:cursor-not-allowed"> {loading ? "正在验证..." : "进入系统"} </button> </div> <div className="text-center text-xs text-gray-300 pt-4">v7.16 (终极稳定版)</div> </div> </div> ); };
+            return ( <div className="min-h-screen login-bg flex items-center justify-center p-4"> <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in relative overflow-hidden"> 
+                <div className={`absolute top-0 left-0 w-full h-1 ${window.isLocalMode ? 'bg-orange-400' : 'bg-green-500'}`}></div>
+                <div className="absolute top-2 right-2 text-[10px] text-gray-400 font-mono">
+                    {window.isLocalMode ? 'LOCAL MODE' : 'CLOUD MODE'}
+                </div>
+                <div className="text-center"> <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner"> <Icon name="Zap" className="w-8 h-8"/> </div> <h1 className="text-2xl font-bold text-gray-800">系统登录</h1> <p className="text-gray-400 text-sm mt-2">请输入管理员提供的访问码</p> </div> 
+                <div className="space-y-4"> <input type="text" value={code} onChange={e=>setCode(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none py-4 tracking-widest bg-gray-50 focus:bg-white transition-all text-indigo-900" placeholder="输入访问码" /> <button onClick={handleLogin} disabled={loading} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all btn-press disabled:opacity-50 disabled:cursor-not-allowed"> {loading ? "正在验证..." : "进入系统"} </button> </div> 
+                <div className="text-center space-y-2">
+                    <div className="text-xs text-gray-300">v7.16 (终极修复版)</div>
+                    {!window.isLocalMode && ( <button onClick={window.forceLocalMode} className="text-[10px] text-orange-400 underline opacity-70 hover:opacity-100">连接失败？切换到本地离线模式</button> )}
+                    {window.isLocalMode && ( <button onClick={window.retryCloudConnection} className="text-[10px] text-blue-500 underline opacity-70 hover:opacity-100">重试连接云端</button> )}
+                </div>
+            </div> </div> ); 
+        };
 
         function App() {
             const [userCode, setUserCode] = useState(localStorage.getItem('lottery_user_code') || null);
@@ -841,7 +902,6 @@
             const [customers, setCustomers] = useState([]);
             const [transfers, setTransfers] = useState({ hk: {}, mo: {} });
             
-            // --- 修复：状态初始化时直接调用函数获取正确生肖 ---
             const [currentYearZodiac, setCurrentYearZodiac] = useState(getAutoZodiac());
             
             const [inputCustomer, setInputCustomer] = useState(''); const [inputContent, setInputContent] = useState(''); const [defaultAmount, setDefaultAmount] = useState('');
@@ -950,7 +1010,6 @@
                 }).join('\n');
                 const txt = `【${stat.name}】对账\n----------------\n开奖: 港[${winningNumberHK||'-'}] 澳[${winningNumberMO||'-'}]\n----------------\n本期总投: ¥${stat.totalStake}\n中特本金: ¥${stat.winningStakeTotal}\n退水: ¥${stat.rebateAmt.toFixed(1)}\n----------------\n盈亏: ${stat.profit>=0?'+':''}${stat.profit.toFixed(1)}\n----------------\n${dt}`;
                 
-                // --- 修复：自动计算字体大小 ---
                 const lines = txt.split('\n').length + 3; 
                 const availableHeight = window.innerHeight - 150; 
                 let size = Math.floor(availableHeight / (lines * 1.5)); 
@@ -1147,50 +1206,29 @@
             const handleUpdateCustomerField = (id, k, v) => setTempCustomers(prev=>prev.map(c=>c.id===id?{...c,[k]:v}:c));
             const handleSaveCustomers = () => { setCustomers(tempCustomers); setShowSettings(false); };
 
-            useEffect(() => { if (!userCode || !sessionID || !window.isFirebaseReady) return; 
-                let docRef;
-                if (window.isLocalMode) {
-                    docRef = window.fb.doc("LOCAL", "access_codes", userCode);
-                } else {
-                    docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode));
-                }
-                const unsub = window.fb.onSnapshot(docRef, (doc) => { if (doc.exists()) { const data = doc.data(); if (!window.isLocalMode && data.currentSessionId && data.currentSessionId !== sessionID) { alert("您的账号已在其他设备登录，您已被强制下线！"); handleLogout(); } } else { alert("账号不存在！"); handleLogout(); } }); return () => unsub(); }, [userCode, sessionID, isLocalMode]);
-            
-            useEffect(() => { if (!userCode || !window.isFirebaseReady) return; const timer = setTimeout(() => { 
-                let docRef;
-                if (window.isLocalMode) {
-                    docRef = window.fb.doc("LOCAL", "access_codes", userCode);
-                } else {
-                    docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode));
-                }
-                window.fb.updateDoc(docRef, { bets, customers, transfers }).catch(e => console.error(e)); }, 2000); return () => clearTimeout(timer); }, [bets, customers, transfers, userCode, isLocalMode]);
-            
+            useEffect(() => { if (!userCode || !sessionID || !window.isFirebaseReady) return; const unsub = window.fb.onSnapshot(window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode)), (doc) => { if (doc.exists()) { const data = doc.data(); if (data.currentSessionId && data.currentSessionId !== sessionID) { alert("您的账号已在其他设备登录，您已被强制下线！"); handleLogout(); } } else { alert("账号不存在！"); handleLogout(); } }); return () => unsub(); }, [userCode, sessionID]);
+            useEffect(() => { if (!userCode || !window.isFirebaseReady) return; const timer = setTimeout(() => { window.fb.updateDoc(window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode)), { bets, customers, transfers }).catch(e => console.error(e)); }, 2000); return () => clearTimeout(timer); }, [bets, customers, transfers, userCode]);
             useEffect(() => { if(bets) localStorage.setItem('lottery_bets_v5', JSON.stringify(bets)) }, [bets]);
             useEffect(() => { if(currentYearZodiac) localStorage.setItem('lottery_year_zodiac', currentYearZodiac) }, [currentYearZodiac]);
             useEffect(() => { if(customers) localStorage.setItem('lottery_customers', JSON.stringify(customers)); }, [customers]);
             useEffect(() => { if(showSettings) setTempCustomers(customers || []); }, [showSettings, customers]);
             useEffect(() => { if (inputCustomer) { setBookTarget(inputCustomer); setBookMode('SINGLE'); } }, [inputCustomer]);
 
-            // --- 新增：自动滚动到异常订单 ---
             useEffect(() => {
                 if (activeTab === 'customers' && focusBatchId) {
                     setTimeout(() => {
                         const el = document.getElementById(`batch-${focusBatchId}`);
                         if (el) {
                             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            // 闪烁高亮效果
                             el.classList.add('ring-4', 'ring-red-400', 'ring-offset-2', 'transition-all', 'duration-500');
                             setTimeout(() => el.classList.remove('ring-4', 'ring-red-400', 'ring-offset-2'), 2500);
                         }
-                    }, 300); // 稍微延迟以等待渲染
-                    
-                    // 滚动完成后清除 focusBatchId，防止重复触发
+                    }, 300); 
                     const timer = setTimeout(() => setFocusBatchId(null), 1000);
                     return () => clearTimeout(timer);
                 }
             }, [activeTab, focusBatchId, displayedCustomerStats]);
 
-            // 移动到 render 之前计算
             const errorCount = useMemo(() => bets.filter(b => b.isError).map(b => b.batchId).filter((v, i, a) => a.indexOf(v) === i).length, [bets]);
 
             if (!userCode && !isAdmin) return <ErrorBoundary><LoginScreen onLogin={handleLoginSuccess} onAdmin={()=>setIsAdmin(true)} /></ErrorBoundary>;
