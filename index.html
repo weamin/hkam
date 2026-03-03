@@ -275,7 +275,16 @@
         };
 
         const parseContentForSegments = (text, defaultAmtStr, currentYearZodiac) => {
-            let clientTotal = ''; const content = text.replace(REGEX_CLIENT_TOTAL, m => { clientTotal=m; return ''; }).trim();
+            let clientTotalStr = '';
+            let clientTotalNum = null;
+            const content = text.replace(REGEX_CLIENT_TOTAL, m => { 
+                clientTotalStr += (clientTotalStr ? ' ' : '') + m;
+                const valMatch = m.match(/(\d+(\.\d+)?)/);
+                if (valMatch) {
+                    clientTotalNum = (clientTotalNum || 0) + parseFloat(valMatch[0]);
+                }
+                return ''; 
+            }).trim();
             if (!content) return [];
             const segments=[], lines = smartMergeLines(content.split(/[\n]/).filter(l=>l.trim()));
             let currType = (new RegExp(PATTERN_HK).test(content) && !new RegExp(PATTERN_MO).test(content)) ? 'HK' : 'MO';
@@ -392,7 +401,11 @@
                     }
                 });
             });
-            if(segments.length>0) { if(clientTotal) segments[0].clientTotal=clientTotal; if(content) segments[0].fullText=content; }
+            if(segments.length>0) { 
+                if(clientTotalStr) segments[0].clientTotal = clientTotalStr; 
+                if(clientTotalNum !== null) segments[0].clientTotalNum = clientTotalNum;
+                if(content) segments[0].fullText=content; 
+            }
             return segments;
         };
 
@@ -969,8 +982,9 @@
                 const previews = blocks.map(b => {
                     const segments = parseContentForSegments(b.text, defaultAmount, currentYearZodiac).filter(s=>s.totalBetCount>0 || s.isSuspicious);
                     const systemTotal = segments.reduce((acc, seg) => acc + (seg.totalBetCount * (seg.isValid&&!seg.isSuspicious?seg.amount:0) * (seg.isDualBet?2:1)), 0);
-                    let clientTotalVal = null; const m = segments[0]?.clientTotal?.match(/(\d+(\.\d+)?)/); if(m) clientTotalVal = parseFloat(m[0]);
-                    return { header: b.header, segments, systemTotal, clientTotalStr: segments[0]?.clientTotal, mismatch: clientTotalVal !== null && Math.abs(clientTotalVal - systemTotal) > 0.5, clientTotalVal };
+                    let clientTotalVal = segments[0]?.clientTotalNum !== undefined ? segments[0].clientTotalNum : null;
+                    let mismatch = clientTotalVal !== null && Math.abs(clientTotalVal - systemTotal) > 0.5;
+                    return { header: b.header, segments, systemTotal, clientTotalStr: segments[0]?.clientTotal, mismatch, clientTotalVal };
                 }).filter(p => p.segments.length > 0);
                 setPreviewBatches(previews);
             }, [inputContent, defaultAmount, currentYearZodiac]);
