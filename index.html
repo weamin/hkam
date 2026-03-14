@@ -217,15 +217,26 @@
             });
             
             txt = txt.replace(/(\d+)\s+(岁|尾|头)/g, '$1$2');
+
             txt = txt.replace(/(\d{2,})\s*(尾|头)/g, (m, digits, suffix) => digits.split('').map(d => d + suffix).join(' '));
+
             txt = txt.replace(new RegExp(`([${ZODIAC_LIST.join('')}])`,'g'), ' $1 ');
             
+            // --- 新增修复：提前拦截残缺的金额写法（如“各元”、“买块”），将其替换为特殊错误词 ---
+            txt = txt.replace(/(各|买|每|x|X)[.,，;；\s]*([元米斤块])/g, ' ERROR_AMOUNT_MISSING ');
+
             txt = txt.replace(/[.,，;；、\/\-*\—–−+。：:…~＇'．Tt特各买个元块钱连碰拖]/g, ' ');
             
             const hasSuspiciousTen = /([尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])\s*十|十\s*(\d+[尾头岁]|[鼠牛虎兔龙蛇马羊猴鸡狗猪])/.test(txt);
             let hasUnknown = false;
             
             txt.split(/\s+/).map(t=>t.replace(REGEX_AMOUNT_WITH_SLASH,'').trim()).filter(t=>t&&!t.includes('(XXF)')&&!t.match(/^\d{11}$/)).forEach(t => {
+                // --- 新增修复：捕获特殊错误词并触发报错 ---
+                if (t === 'ERROR_AMOUNT_MISSING') {
+                    hasUnknown = true;
+                    return;
+                }
+
                 const heMatch = t.match(/^合(?:数)?(\d+)$/); 
                 if(heMatch) { const v=parseInt(heMatch[1]); if(!isNaN(v)) for(let i=1;i<=49;i++) if(Math.floor(i/10)+(i%10)===v){nums.push(i);count++} return; }
                 
