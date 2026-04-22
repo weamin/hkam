@@ -156,7 +156,6 @@
             const merged=[]; let pending=""; 
             const hasAmount=(s)=> {
                 const cleanS = s.replace(/各?\s*[一1]?\s*遍/g, '');
-                // 修复：识别 ERROR_AMOUNT_MISSING，防止带有错误标识的行继续向后吞并合并
                 return /((每个|每号|个号|个|各|买|x|X|号|=|每)[\s.．。、…~＇']*[\d零一二三四五六七八九十百千]+)|(\d+[\s.．。、…~＇']*[元米斤块])|(\d+[\s.．。、…~＇']*x)|ERROR_AMOUNT_MISSING/.test(cleanS);
             };
             lines.forEach(line => { 
@@ -196,29 +195,52 @@
                    }
                 });
 
+                // 核心判断方法：当前数字是否符合所要求的单位后缀
+                const isStrictValid = (strText, sType) => {
+                    const v = parseInt(strText);
+                    // 前导零防护：像 02, 09 这样的通常是独立号码，绝非岁数或尾数
+                    if (strText.length >= 2 && strText.startsWith('0')) return false;
+                    if (sType === '岁' && v >= 1 && v <= 12) return true;
+                    if (sType === '尾' && v >= 0 && v <= 9) return true;
+                    if (sType === '头' && v >= 0 && v <= 4) return true;
+                    return false;
+                };
+
                 let applySuffix = true;
                 for (let i = tokens.length - 1; i >= 0; i--) {
                     if (tokens[i].type === 'num') {
-                        const val = tokens[i].val;
                         const text = tokens[i].text;
-                        let isValid = false;
-                        if(s==='岁' && val>=1 && val<=12) isValid = true;
-                        if(s==='尾' && val>=0 && val<=9) isValid = true;
-                        if(s==='头' && val>=0 && val<=4) isValid = true;
-
-                        if (isValid && i < tokens.length - 1) {
-                            const sepAfter = tokens[i+1].text;
-                            if (text.length >= 2 && text.startsWith('0')) {
-                                isValid = false;
+                        
+                        if (isStrictValid(text, s)) {
+                            // 智能语境组群探测
+                            if (applySuffix && i < tokens.length - 1) {
+                                const sepAfter = tokens[i+1].text;
+                                const isStrongSep = /[.,，。;；、*\/．…~＇'-]{2,}/.test(sepAfter.replace(/\s/g, ''));
+                                
+                                if (isStrongSep) {
+                                    // 往前看，检查左侧的“语境群”是否纯粹
+                                    let leftClusterClean = true;
+                                    for (let j = 0; j <= i; j++) {
+                                        if (tokens[j].type === 'num') {
+                                            if (!isStrictValid(tokens[j].text, s)) {
+                                                leftClusterClean = false;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    // 如果混杂了违规数字（说明是散码区），强分隔符生效，阻断传染
+                                    if (!leftClusterClean) {
+                                        applySuffix = false;
+                                    }
+                                    // 反之：如果左边全都是合法的，那就是“纯洁组”，说明强分隔符只是用户手滑，原谅它，继续传染。
+                                }
                             }
-                            if (/[.,，。;；、*\/．…~＇'-]{2,}/.test(sepAfter.replace(/\s/g, ''))) {
-                                isValid = false;
-                            }
-                        }
 
-                        if (isValid && applySuffix) {
-                            tokens[i].text = tokens[i].text + s;
+                            if (applySuffix) {
+                                tokens[i].text = tokens[i].text + s;
+                            }
                         } else {
+                            // 遇到超出范围的错误数字，直接永久阻断后续传染
                             applySuffix = false; 
                         }
                     }
@@ -316,7 +338,6 @@
                 processedLine = processedLine.replace(/([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)\s*[.,，;；\s]+\s*(?=(?:香港|香|港))/g, '$1\n');
                 processedLine = processedLine.replace(/(香港|香|港)\s*[.,，;；\s]+\s*(?=(?:[奥澳][门]?|[新老]?[澳奥]门|噢T|溴T))/g, '$1\n');
                 
-                // --- 修复关键：拦截漏写前缀的纯数字串金额 (如 "10.12.8.4元") ---
                 processedLine = processedLine.replace(/(\d+(?:[.,，;；、]+\d+){2,})\s*([元米斤块])/g, '$1 ERROR_AMOUNT_MISSING ');
 
                 processedLine = processedLine.replace(/((?:每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)\s*[\d零一二三四五六七八九十百千]+(?:[\.]\d+)?[元米斤块]?)\s*[，,;；]\s*/g, '$1\n');
