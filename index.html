@@ -124,10 +124,11 @@
 
         const PATTERN_HK = "香港|香|港"; 
         const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥"; 
-        const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：]*[澳门奥])|([澳门奥][\\s.,，;；:：]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(澳门香港)|(香港澳门)");
+        
+        // --- 修复：添加了 (双面网) 以及其相关变体保护 ---
+        const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：]*[澳门奥])|([澳门奥][\\s.,，;；:：]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(澳门香港)|(香港澳门)|(香港奥门)|(奥门香港)|(双面网)|(双网)|(两网)");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
         
-        // --- 修复：在金额前置标识符和数字之间，允许出现减号/连字符 '-' ---
         const BASE_AMOUNT_PARTS = [
             `((每个号各|每个号|每号各|每个|每号|个号|各|买|x|X|号|=|每)[\\s.．。、…~＇'-]*(?:\\d+(?:\\.\\d+)?[\\s.．。、…~＇']*[${UNITS}]|\\d+))`, 
             `(\\d+(?:\\.\\d+)?[\\s.．。、…~＇']*[${UNITS}])`, 
@@ -255,7 +256,6 @@
             txt = txt.replace(/(\d{2,})\s*(尾|头)/g, (m, digits, suffix) => digits.split('').map(d => d + suffix).join(' '));
             txt = txt.replace(new RegExp(`([${ZODIAC_LIST.join('')}])`,'g'), ' $1 ');
             
-            // 修复：允许带减号的无数字单位写法，如“各-元”
             txt = txt.replace(/(各|买|每|x|X)[.,，;；\s\-]*([元米斤块])/g, ' ERROR_AMOUNT_MISSING ');
             txt = txt.replace(/[.,，;；、\/\-*\—–−+。：:…~＇'．Tt特各买个元块钱连碰拖]/g, ' ');
             
@@ -307,8 +307,6 @@
                 }
                 hasUnknown = true;
             });
-
-            // 保持不去重的逻辑（即还原用户的多次下注算多次的意图）
             return { numbers: nums.sort((a,b)=>a-b), totalBetCount: count, type, hasUnknown: hasUnknown||hasSuspiciousTen };
         };
 
@@ -339,6 +337,9 @@
 
                 let processedLine = line.replace(/(\d)个/g, '$1 '); 
                 
+                // --- 修复：双面网预保护 ---
+                processedLine = processedLine.replace(/(香港澳门|澳门香港|香港奥门|奥门香港|港澳|澳港|香奥|港奥|双面网|双网|两网)/g, ' 双面网 ');
+
                 processedLine = processedLine.replace(/([\d元块遍岁尾头][\s.,，;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)\s*(?=(?:香港|香|港))/g, '$1$2\n');
                 processedLine = processedLine.replace(/([\d元块遍岁尾头][\s.,，;；]*)(香港|香|港)\s*(?=(?:[奥澳][门]?|[新老]?[澳奥]门|噢T|溴T))/g, '$1$2\n');
                 processedLine = processedLine.replace(/([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)\s*[.,，;；\s]+\s*(?=(?:香港|香|港))/g, '$1\n');
