@@ -124,7 +124,7 @@
 
         const PATTERN_HK = "香港|香|港"; 
         const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥"; 
-        const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：]*[澳门奥])|([澳门奥][\\s.,，;；:：]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(澳门香港)|(香港澳门)|(双面网)|(双网)|(两网)");
+        const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：]*[澳门奥])|([澳门奥][\\s.,，;；:：]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(澳门香港)|(香港澳门)");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
         
         const BASE_AMOUNT_PARTS = [
@@ -164,7 +164,8 @@
         const smartMergeLines = (lines) => { 
             const merged=[]; let pending=""; 
             const hasAmount=(s)=> {
-                const cleanS = s.replace(/各?\s*[一1]?\s*遍/g, '');
+                // 清理“各买一遍”以防干扰
+                const cleanS = s.replace(/各?买?\s*[一1]?\s*遍/g, '');
                 return /((每个|每号|个号|个|各|买|x|X|号|=|每)[\s.．。、…~＇'-]*[\d零一二三四五六七八九十百千]+)|(\d+[\s.．。、…~＇']*[元米斤块])|(\d+[\s.．。、…~＇']*x)|ERROR_AMOUNT_MISSING/.test(cleanS);
             };
             lines.forEach(line => { 
@@ -187,7 +188,8 @@
             let nums=[], count=0, type=defaultType, txt=text.toUpperCase();
             if (new RegExp(PATTERN_HK).test(text)) type='HK'; else if (new RegExp(PATTERN_MO).test(text)) type='MO';
             
-            txt = txt.replace(/各?\s*[一1]?\s*遍/g, ' ');
+            // 彻底清理“各买一遍”
+            txt = txt.replace(/各?买?\s*[一1]?\s*遍/g, ' ');
             txt = txt.replace(/(香门)|(港门)|(门香)/g, ' '); 
             
             txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/(\d+)\s*[.,，;；*]+\s*(?:各)?\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
@@ -335,13 +337,20 @@
 
                 let processedLine = line.replace(/(\d)个/g, '$1 '); 
                 
-                // 智能转场切割：如果“香港”“澳门”这种词被夹在两段下注中间，视为转场分隔符，切割成两行
-                processedLine = processedLine.replace(/([\d元块遍岁尾头][\s.,，;；:：]*)(香港|香|港)[\s.,，;；:：]*([澳门奥][门]?|[新老]?[澳奥]门|噢T|溴T)(?=[\s.,，;；:：]*[\d鼠牛虎兔龙蛇马羊猴鸡狗猪各买每xX])/g, '$1$2\n$3');
-                processedLine = processedLine.replace(/([\d元块遍岁尾头][\s.,，;；:：]*)([澳门奥][门]?|[新老]?[澳奥]门|噢T|溴T)[\s.,，;；:：]*(香港|香|港)(?=[\s.,，;；:：]*[\d鼠牛虎兔龙蛇马羊猴鸡狗猪各买每xX])/g, '$1$2\n$3');
+                // --- 核心修复：语境探测夹击截断算法 (Sandwich with Lookahead) ---
+                // 仅当“香港”和“奥门”后面跟着下一个下注指令（号码或关键字）时，才认为它们是分割用的。
+                // 如果它们在结尾（如“香港奥门各买一遍”），则不发生截断，保留给下一阶段识别为整行双边。
+                const nextBetStart = '(?=[\\s.,，;；]*[\\d鼠牛虎兔龙蛇马羊猴鸡狗猪单双大小合红蓝绿])';
                 
-                // 如果有明显空格标点隔开，且后面跟有内容，也视为转场
-                processedLine = processedLine.replace(/([澳门奥][门]?|[新老]?[澳奥]门|噢T|溴T)[\s.,，;；:：]+(香港|香|港)(?=[\s.,，;；:：]*[\d鼠牛虎兔龙蛇马羊猴鸡狗猪各买每xX])/g, '$1\n$2');
-                processedLine = processedLine.replace(/(香港|香|港)[\s.,，;；:：]+([澳门奥][门]?|[新老]?[澳奥]门|噢T|溴T)(?=[\s.,，;；:：]*[\d鼠牛虎兔龙蛇马羊猴鸡狗猪各买每xX])/g, '$1\n$2');
+                const p1 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)[\\s.,，;；]*(香港|香|港)${nextBetStart}`, 'g');
+                const p2 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)(香港|香|港)[\\s.,，;；]*([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)${nextBetStart}`, 'g');
+                const p3 = new RegExp(`([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)[.,，;；\\s]+(香港|香|港)${nextBetStart}`, 'g');
+                const p4 = new RegExp(`(香港|香|港)[.,，;；\\s]+([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)${nextBetStart}`, 'g');
+
+                processedLine = processedLine.replace(p1, '$1$2\n$3');
+                processedLine = processedLine.replace(p2, '$1$2\n$3');
+                processedLine = processedLine.replace(p3, '$1\n$2');
+                processedLine = processedLine.replace(p4, '$1\n$2');
                 
                 processedLine = processedLine.replace(/(\d+(?:[.,，;；、]+\d+){2,})\s*([元米斤块])/g, '$1 ERROR_AMOUNT_MISSING ');
 
@@ -351,19 +360,27 @@
                 
                 splitParts.forEach(subLine => {
                     if(!subLine.trim()) return;
+
+                    // --- 核心修复：行级别的“双面网”上下文传染 ---
+                    const subLineHasDual = REGEX_DUAL.test(subLine);
+                    let subLineType = null;
+                    if (!subLineHasDual) {
+                        if (new RegExp(PATTERN_HK).test(subLine)) subLineType = 'HK';
+                        else if (new RegExp(PATTERN_MO).test(subLine)) subLineType = 'MO';
+                    }
+
+                    if (subLineHasDual) {
+                        currIsDual = true; // 只要行内有双网指令，这整行都是双网
+                    } else if (subLineType) {
+                        currType = subLineType;
+                        currIsDual = false;
+                    }
                     
                     const regex = /(各|买|=|每|号)/.test(subLine) ? REGEX_AMOUNT_NO_SLASH : REGEX_AMOUNT_WITH_SLASH;
                     const matches = Array.from(subLine.matchAll(regex));
-                    
-                    const subLineHasDual = REGEX_DUAL.test(subLine);
 
                     if (matches.length === 0) {
-                        if (subLineHasDual) { currIsDual = true; }
-                        else if (new RegExp(PATTERN_HK).test(subLine)) { currType = 'HK'; currIsDual = false; }
-                        else if (new RegExp(PATTERN_MO).test(subLine)) { currType = 'MO'; currIsDual = false; }
-
                         const res = parseContentWithoutAmount(subLine, currType, currentYearZodiac);
-                        
                         if (res.totalBetCount > 0 || res.hasUnknown || subLine.trim()) {
                             segments.push({ 
                                 numbers:res.numbers, 
@@ -385,13 +402,7 @@
                             let amt=0, numM=amtTxt.match(/(\d+(\.\d+)?)/); if(numM) amt=parseFloat(numM[0]); else { const chM=amtTxt.match(new RegExp(`[${CH_NUM}]+`)); if(chM) amt=parseChineseNumber(chM[0]); }
                             
                             if(content){ 
-                                const contentHasDual = REGEX_DUAL.test(content);
-                                if (contentHasDual) { currIsDual = true; }
-                                else if (new RegExp(PATTERN_HK).test(content)) { currType = 'HK'; currIsDual = false; }
-                                else if (new RegExp(PATTERN_MO).test(content)) { currType = 'MO'; currIsDual = false; }
-
                                 const res=parseContentWithoutAmount(content, currType, currentYearZodiac); 
-                                
                                 segments.push({ 
                                     numbers:res.numbers, 
                                     totalBetCount:res.totalBetCount, 
@@ -409,20 +420,9 @@
                         });
                         const trail = subLine.substring(cursor).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
                         if(trail){ 
-                            const trailHasDual = REGEX_DUAL.test(trail);
-                            if (trailHasDual) { currIsDual = true; }
-                            else if (new RegExp(PATTERN_HK).test(trail)) { currType = 'HK'; currIsDual = false; }
-                            else if (new RegExp(PATTERN_MO).test(trail)) { currType = 'MO'; currIsDual = false; }
-
                             const res=parseContentWithoutAmount(trail, currType, currentYearZodiac); 
-                            
-                            if (res.totalBetCount === 0 && segments.length > 0 && trailHasDual) {
+                            if (res.totalBetCount === 0 && segments.length > 0) {
                                 segments[segments.length - 1].rawLine += trail;
-                                segments[segments.length - 1].isDualBet = true; 
-                            } else if (res.totalBetCount === 0 && segments.length > 0 && (new RegExp(PATTERN_HK).test(trail) || new RegExp(PATTERN_MO).test(trail))) {
-                                segments[segments.length - 1].rawLine += trail;
-                                segments[segments.length - 1].type = currType; 
-                                segments[segments.length - 1].isDualBet = false;
                             } else if(res.totalBetCount>0 || res.hasUnknown) {
                                 segments.push({ 
                                     numbers:res.numbers, 
@@ -456,7 +456,7 @@
         const CustomerSelectModal = ({ customers, onSelect, onClose }) => ( <ModalContainer> <div className="bg-white w-full max-w-sm rounded-xl p-4 max-h-[80vh] flex flex-col shadow-2xl"> <div className="flex justify-between items-center mb-4 border-b pb-2"> <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Icon name="User" className="w-5 h-5 text-indigo-600"/> 选择客户</h3> <button onClick={onClose} className="p-2 btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button> </div> <div className="flex-1 overflow-y-auto space-y-2"> {customers.map(c => <button key={c.id} onClick={()=>onSelect(c.name)} className="w-full text-left p-3 rounded-lg hover:bg-indigo-50 border border-slate-100 font-bold text-slate-700 flex items-center justify-between active:bg-indigo-100 transition-colors btn-press"><span>{c.name}</span><span className="text-xs text-slate-400 font-normal">赔{c.odds} / 退{c.rebate*100}%</span></button>)} </div> <button onClick={onClose} className="mt-4 w-full py-3 border rounded-lg text-slate-500 font-medium btn-press">取消</button> </div> </ModalContainer> );
         const MobileRiskTable = ({title,color,data,total}) => ( <div className="bg-white rounded shadow border border-slate-200 flex flex-col h-full overflow-hidden"> <div className={`p-2 text-center font-bold text-xs ${color==='red'?'bg-red-50 text-red-700':'bg-green-50 text-green-700'}`}>{title} (¥{total.toLocaleString()})</div> <div className="flex-1 overflow-y-auto"> <table className="w-full text-xs text-center"> <thead className="bg-slate-50 text-slate-400"><tr><th className="py-1">号</th><th>注</th><th>亏</th></tr></thead> <tbody>{data.map(d=><tr key={d.num} className={`border-b last:border-0 ${d.customerPL>0?'bg-red-50':''}`}><td className="py-2 font-bold">{d.num}</td><td className="text-slate-500">{d.betAmt>0?d.betAmt:'-'}</td><td className={d.customerPL>0?'text-red-600 font-bold':'text-green-600'}>{Math.round(d.customerPL)}</td></tr>)}</tbody> </table> </div> </div> );
         
-        const EditOrderModal = ({ batchId, onClose, onSave, bets, currentYearZodiac }) => { 
+        const EditOrderModal = ({ batchId, onClose, onSave, onInsertNew, bets, currentYearZodiac }) => { 
             const recs = bets.filter(b=>b.batchId===batchId); 
             const [lines, setLines] = useState(() => {
                 const result = [];
@@ -472,6 +472,8 @@
                 }
                 return result.filter(l => l && l.trim());
             });
+            const [showInsert, setShowInsert] = useState(false); 
+            const [insertText, setInsertText] = useState(''); 
             const header = recs[0]?.originalHeader; 
             const originalDisplay = recs[0]?.fullText || lines.join('\n'); 
             const stats = lines.map(l => { 
@@ -490,6 +492,13 @@
                 }); 
             }; 
 
+            const handleConfirmInsert = () => {
+                if (!insertText.trim()) { setShowInsert(false); return; }
+                onInsertNew(batchId, insertText);
+                setInsertText('');
+                setShowInsert(false);
+            };
+
             return ( 
                 <ModalContainer> 
                     <div className="bg-white w-full h-[80vh] rounded-xl flex flex-col overflow-hidden"> 
@@ -499,34 +508,58 @@
                         </div> 
                         
                         <div className="flex-1 overflow-y-auto p-4 space-y-4"> 
-                            <div className="bg-yellow-50 p-3 rounded text-xs text-slate-600 border border-yellow-100">
-                                <strong className="block mb-1">原始记录:</strong>
-                                <pre className="whitespace-pre-wrap font-mono break-all">{originalDisplay}</pre>
-                                {recs[0]?.originalTotal && <div className="mt-1 text-orange-600 font-bold">客户手写: {recs[0].originalTotal}</div>}
-                            </div> 
-                            {lines.map((l,i)=>(
-                                <div key={i} className="space-y-1">
-                                    <div className={`flex gap-2 p-2 rounded border ${!stats[i].valid?'border-red-300 bg-red-50':'border-slate-200'}`}>
-                                        <span className="text-slate-400 w-4 pt-2 text-xs">{i+1}</span>
-                                        <textarea value={l} onChange={e=>{const n=[...lines];n[i]=e.target.value;setLines(n)}} className="flex-1 bg-transparent outline-none text-sm resize-none h-auto overflow-hidden break-all" rows={1} style={{minHeight:'24px'}}/>
-                                        <div className="text-right">
-                                            <div className="text-xs text-slate-400 font-bold">¥{stats[i].amt}</div>
-                                            <button onClick={()=>{const n=[...lines];n.splice(i,1);setLines(n)}} className="text-red-400 mt-1"><Icon name="X" className="w-4 h-4"/></button>
+                            {!showInsert ? (
+                                <>
+                                    <div className="bg-yellow-50 p-3 rounded text-xs text-slate-600 border border-yellow-100">
+                                        <strong className="block mb-1">原始记录:</strong>
+                                        <pre className="whitespace-pre-wrap font-mono break-all">{originalDisplay}</pre>
+                                        {recs[0]?.originalTotal && <div className="mt-1 text-orange-600 font-bold">客户手写: {recs[0].originalTotal}</div>}
+                                    </div> 
+                                    {lines.map((l,i)=>(
+                                        <div key={i} className="space-y-1">
+                                            <div className={`flex gap-2 p-2 rounded border ${!stats[i].valid?'border-red-300 bg-red-50':'border-slate-200'}`}>
+                                                <span className="text-slate-400 w-4 pt-2 text-xs">{i+1}</span>
+                                                <textarea value={l} onChange={e=>{const n=[...lines];n[i]=e.target.value;setLines(n)}} className="flex-1 bg-transparent outline-none text-sm resize-none h-auto overflow-hidden break-all" rows={1} style={{minHeight:'24px'}}/>
+                                                <div className="text-right">
+                                                    <div className="text-xs text-slate-400 font-bold">¥{stats[i].amt}</div>
+                                                    <button onClick={()=>{const n=[...lines];n.splice(i,1);setLines(n)}} className="text-red-400 mt-1"><Icon name="X" className="w-4 h-4"/></button>
+                                                </div>
+                                            </div>
+                                            {!stats[i].valid && (<div className="text-xs p-2 ml-6 bg-red-50 border border-red-100 rounded"><div className="text-red-500 mb-1 font-bold">纠错预览 (红色为异常内容):</div><div className="flex flex-wrap items-center">{renderHighlightedTokens(l)}</div></div>)}
                                         </div>
+                                    ))}
+                                    
+                                    <div className="flex gap-2 pt-2">
+                                        <button onClick={()=>setLines([...lines,''])} className="w-full py-3 border-2 border-dashed rounded text-slate-400 font-bold btn-press text-sm">+ 添加空行</button>
                                     </div>
-                                    {!stats[i].valid && (<div className="text-xs p-2 ml-6 bg-red-50 border border-red-100 rounded"><div className="text-red-500 mb-1 font-bold">纠错预览 (红色为异常内容):</div><div className="flex flex-wrap items-center">{renderHighlightedTokens(l)}</div></div>)}
+                                </>
+                            ) : (
+                                <div className="h-full flex flex-col animate-fade-in">
+                                    <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 mb-3 text-sm text-indigo-800">
+                                        <strong>功能说明：</strong><br/>
+                                        您输入的内容将生成一个<b>独立的订单</b>，并插入到当前订单之后（原来的后续订单会自动顺延）。
+                                    </div>
+                                    <textarea 
+                                        className="flex-1 w-full p-3 border-2 border-indigo-100 rounded-lg bg-slate-50 focus:bg-white focus:border-indigo-500 outline-none resize-none font-mono text-base"
+                                        placeholder="在此粘贴新的注单内容... (例如: 狗.猪.羊各20)"
+                                        value={insertText}
+                                        onChange={e => setInsertText(e.target.value)}
+                                        autoFocus
+                                    />
+                                    <div className="flex gap-3 mt-4">
+                                        <button onClick={()=>setShowInsert(false)} className="flex-1 py-3 border rounded-lg font-bold text-slate-500 btn-press">返回</button>
+                                        <button onClick={handleConfirmInsert} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow btn-press">确认插入</button>
+                                    </div>
                                 </div>
-                            ))}
-                            
-                            <div className="flex gap-2 pt-2">
-                                <button onClick={()=>setLines([...lines,''])} className="w-full py-3 border-2 border-dashed rounded text-slate-400 font-bold btn-press text-sm">+ 添加空行</button>
-                            </div>
+                            )}
                         </div> 
                         
-                        <div className="p-4 border-t flex gap-3">
-                            <button onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold btn-press">取消</button>
-                            <button onClick={()=>onSave(batchId, lines.filter(x=>x.trim()))} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow btn-press">保存修改</button>
-                        </div> 
+                        {!showInsert && (
+                            <div className="p-4 border-t flex gap-3">
+                                <button onClick={onClose} className="flex-1 py-3 border rounded-lg font-bold btn-press">取消</button>
+                                <button onClick={()=>onSave(batchId, lines.filter(x=>x.trim()))} className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow btn-press">保存修改</button>
+                            </div> 
+                        )}
                     </div> 
                 </ModalContainer> 
             ); 
@@ -1493,7 +1526,7 @@
                                         <div className="text-xs bg-white px-2 py-1 rounded border border-red-200 font-bold">点击定位</div>
                                     </div>
                                 )}
-                                <div className="bg-white p-2 rounded-xl shadow-sm border border-indigo-50 sticky top-[72px] z-40 flex flex-col gap-2"><div className="flex justify-between items-center"><div className="flex bg-slate-100 rounded-lg p-1"><button onClick={()=>setBookMode('ALL')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${bookMode==='ALL'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}>全部</button><button onClick={()=>setBookMode('SINGLE')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${bookMode==='SINGLE'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}>指定</button></div><div className="text-right"><div className="text-xs text-slate-400">列表总额</div><div className="font-bold text-indigo-600">¥{displayedCustomerStats.reduce((a,c)=>a+c.total,0)}</div></div></div>{bookMode==='SINGLE' && <select value={bookTarget} onChange={e=>setBookTarget(e.target.value)} className="w-full bg-slate-50 border rounded-lg p-2 text-sm font-bold text-slate-700 outline-none">{customers.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select>}</div>{displayedCustomerStats.map(cust => <details key={cust.name} open className="bg-white border rounded-xl shadow-sm overflow-hidden group"><summary className="flex justify-between items-center p-4 cursor-pointer bg-slate-50 group-open:bg-indigo-50 transition-colors"><div className="flex items-center gap-2"><div className="font-bold text-lg text-slate-800">{cust.name}</div><button onClick={(e)=>{e.stopPropagation();setInsertOrderTarget(cust.name)}} className="bg-indigo-100 text-indigo-600 px-2 py-1 rounded text-xs font-bold border border-indigo-200 shadow-sm btn-press flex items-center gap-1"><Icon name="PlusCircle" className="w-4 h-4"/> 插入</button></div><div className="font-bold text-indigo-600 text-xl">¥{cust.total}</div></summary><div className="p-3 space-y-3 bg-white border-t border-slate-100">{cust.batches.map((batch,i)=><div id={`batch-${batch.batchId}`} key={batch.batchId} className={`border rounded-lg p-3 transition-colors duration-500 ${batch.isTransferred ? 'bg-gray-100 border-gray-300 opacity-75' : batch.records.some(r=>r.isError)?'bg-red-50 border-red-200 shadow-md ring-1 ring-red-100':'bg-slate-50/50 border-slate-200'}`}><div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200/50"><span className={`font-bold text-sm flex items-center gap-2 ${batch.records.some(r=>r.isError) ? 'text-red-600' : 'text-slate-600'}`}>#{i+1} 笔: ¥{batch.total} {batch.records.some(r=>r.isError) && <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-[10px]">异常</span>} {batch.isTransferred && <span className="bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[10px] border border-gray-300">已转出</span>}</span><div className="flex gap-2"><button onClick={()=>handleTransferBatch(batch.batchId, batch.isTransferred)} className={`text-xs px-2.5 py-1 rounded-md border font-bold shadow-sm btn-press flex items-center gap-1 ${batch.isTransferred ? 'bg-white text-slate-500 border-slate-300' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>{batch.isTransferred ? '恢复' : '转出'}</button><button onClick={(e)=>{e.stopPropagation();setInsertBatchTarget(batch.batchId)}} className="text-xs bg-white text-indigo-600 px-2.5 py-1 rounded-md border border-indigo-200 font-bold shadow-sm btn-press">插</button><button onClick={(e)=>{e.stopPropagation();setBatchToEdit(batch.batchId)}} className="text-xs bg-white text-yellow-600 px-2.5 py-1 rounded-md border border-yellow-200 font-bold shadow-sm btn-press">改</button><button onClick={(e)=>{e.stopPropagation();handleDeleteBatchWithModal(batch.batchId)}} className="text-xs bg-white text-red-600 px-2.5 py-1 rounded-md border border-red-200 font-bold shadow-sm btn-press">删</button></div></div><div className="text-xs font-mono text-slate-600 space-y-1">{batch.records.map((r,ri)=><div key={ri} className="flex justify-between border-b border-slate-100 last:border-0 pb-1 mb-1 items-start"><span className={`break-all flex-1 mr-2 ${r.isError?'text-red-600 font-bold':''}`}>{r.rawInput}{r.type==='HK'&&<span className="text-red-500 ml-1 text-[10px] bg-red-50 px-1 rounded">港</span>}</span><span className="text-slate-400 shrink-0 font-bold">{r.isError?'(异常)':`¥${r.totalAmount}`}</span></div>)}</div></div>)}</div></details>)}</div>}
+                                <div className="bg-white p-2 rounded-xl shadow-sm border border-indigo-50 sticky top-[72px] z-40 flex flex-col gap-2"><div className="flex justify-between items-center"><div className="flex bg-slate-100 rounded-lg p-1"><button onClick={()=>setBookMode('ALL')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${bookMode==='ALL'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}>全部</button><button onClick={()=>setBookMode('SINGLE')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${bookMode==='SINGLE'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}>指定</button></div><div className="text-right"><div className="text-xs text-slate-400">列表总额</div><div className="font-bold text-indigo-600">¥{displayedCustomerStats.reduce((a,c)=>a+c.total,0)}</div></div></div>{bookMode==='SINGLE' && <select value={bookTarget} onChange={e=>setBookTarget(e.target.value)} className="w-full bg-slate-50 border rounded-lg p-2 text-sm font-bold text-slate-700 outline-none">{customers.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select>}</div>{displayedCustomerStats.map(cust => <details key={cust.name} open className="bg-white border rounded-xl shadow-sm overflow-hidden group"><summary className="flex justify-between items-center p-4 cursor-pointer bg-slate-50 group-open:bg-indigo-50 transition-colors"><div className="flex items-center gap-2"><div className="font-bold text-lg text-slate-800">{cust.name}</div></div><div className="font-bold text-indigo-600 text-xl">¥{cust.total}</div></summary><div className="p-3 space-y-3 bg-white border-t border-slate-100">{cust.batches.map((batch,i)=><div id={`batch-${batch.batchId}`} key={batch.batchId} className={`border rounded-lg p-3 transition-colors duration-500 ${batch.isTransferred ? 'bg-gray-100 border-gray-300 opacity-75' : batch.records.some(r=>r.isError)?'bg-red-50 border-red-200 shadow-md ring-1 ring-red-100':'bg-slate-50/50 border-slate-200'}`}><div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200/50"><span className={`font-bold text-sm flex items-center gap-2 ${batch.records.some(r=>r.isError) ? 'text-red-600' : 'text-slate-600'}`}>#{i+1} 笔: ¥{batch.total} {batch.records.some(r=>r.isError) && <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-[10px]">异常</span>} {batch.isTransferred && <span className="bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[10px] border border-gray-300">已转出</span>}</span><div className="flex gap-2"><button onClick={()=>handleTransferBatch(batch.batchId, batch.isTransferred)} className={`text-xs px-2.5 py-1 rounded-md border font-bold shadow-sm btn-press flex items-center gap-1 ${batch.isTransferred ? 'bg-white text-slate-500 border-slate-300' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>{batch.isTransferred ? '恢复' : '转出'}</button><button onClick={(e)=>{e.stopPropagation();setInsertBatchTarget(batch.batchId)}} className="text-xs bg-white text-indigo-600 px-2.5 py-1 rounded-md border border-indigo-200 font-bold shadow-sm btn-press">插</button><button onClick={(e)=>{e.stopPropagation();setBatchToEdit(batch.batchId)}} className="text-xs bg-white text-yellow-600 px-2.5 py-1 rounded-md border border-yellow-200 font-bold shadow-sm btn-press">改</button><button onClick={(e)=>{e.stopPropagation();handleDeleteBatchWithModal(batch.batchId)}} className="text-xs bg-white text-red-600 px-2.5 py-1 rounded-md border border-red-200 font-bold shadow-sm btn-press">删</button></div></div><div className="text-xs font-mono text-slate-600 space-y-1">{batch.records.map((r,ri)=><div key={ri} className="flex justify-between border-b border-slate-100 last:border-0 pb-1 mb-1 items-start"><span className={`break-all flex-1 mr-2 ${r.isError?'text-red-600 font-bold':''}`}>{r.rawInput}{r.type==='HK'&&<span className="text-red-500 ml-1 text-[10px] bg-red-50 px-1 rounded">港</span>}</span><span className="text-slate-400 shrink-0 font-bold">{r.isError?'(异常)':`¥${r.totalAmount}`}</span></div>)}</div></div>)}</div></details>)}</div>}
                             {/* Risk Tab */}
                             {activeTab === 'risk' && <div className="h-full flex flex-col overflow-hidden"><div className="flex justify-between mb-2 shrink-0"><div className="flex bg-white rounded-lg border p-1 text-xs font-bold shadow-sm"><button onClick={()=>setRiskFilter('MO')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='MO'?'bg-green-500 text-white shadow-sm':'text-slate-500'}`}>澳</button><button onClick={()=>setRiskFilter('HK')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='HK'?'bg-red-500 text-white shadow-sm':'text-slate-500'}`}>港</button><button onClick={()=>setRiskFilter('ALL')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='ALL'?'bg-indigo-500 text-white shadow-sm':'text-slate-500'}`}>全</button></div><button onClick={()=>setShowHedgingModal(true)} className="bg-orange-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-md shadow-orange-200 btn-press"><Icon name="Scale" className="w-4 h-4"/> 智能吃码</button></div><div className="flex-1 overflow-y-auto grid grid-cols-2 gap-3 pb-24">{(riskFilter==='ALL'||riskFilter==='MO')&&<MobileRiskTable title="🇲🇴 澳门" color="green" data={riskStats.mo} total={riskStats.moPool} />}{(riskFilter==='ALL'||riskFilter==='HK')&&<MobileRiskTable title="🇭🇰 香港" color="red" data={riskStats.hk} total={riskStats.hkPool} />}</div></div>}
                             {/* Reconciliation Tab */}
@@ -1504,11 +1537,10 @@
                         {batchToEdit && <EditOrderModal batchId={batchToEdit} onClose={()=>setBatchToEdit(null)} onSave={handleSaveEditedBatch} onInsertNew={handleInsertBatchAfter} bets={bets} currentYearZodiac={currentYearZodiac} />}
                         {viewingRawBatch && <RawRecordModal batch={viewingRawBatch} onClose={()=>setViewingRawBatch(null)} />}
                         
-                        {/* 传入新增的 hedgingHistory */}
-                        {showHedgingModal && <HedgingModal onClose={()=>setShowHedgingModal(false)} riskStats={riskStats} riskFilter={riskFilter} customers={customers} bets={bets} showAlert={showAlert} transfers={transfers} onSaveTransfers={handleSaveTransfers} hedgingHistory={hedgingHistory} setHedgingHistory={setHedgingHistory} setConfirmation={setConfirmation} />}
+                        {/* Pass lastHedgingText and setLastHedgingText to HedgingModal */}
+                        {showHedgingModal && <HedgingModal onClose={()=>setShowHedgingModal(false)} riskStats={riskStats} riskFilter={riskFilter} customers={customers} bets={bets} showAlert={showAlert} transfers={transfers} onSaveTransfers={handleSaveTransfers} lastHedgingText={lastHedgingText} setLastHedgingText={setLastHedgingText} />}
                         
                         {insertOrderTarget && <InsertOrderModal customerName={insertOrderTarget} onClose={()=>setInsertOrderTarget(null)} onSave={handleInsertBatchFromModal} />}
-                        {insertBatchTarget && <InsertAfterBatchModal batchId={insertBatchTarget} bets={bets} onClose={()=>setInsertBatchTarget(null)} onSave={handleInsertBatchAfter} />}
                         <ConfirmationModal confirmation={confirmation} />
                         {showCustomerModal && <CustomerSelectModal customers={customers} onSelect={n=>{setInputCustomer(n);setShowCustomerModal(false);showAlert(`已切换: ${n}`, 'success')}} onClose={()=>setShowCustomerModal(false)} />}
                         {actionSheet && <ActionSheet title={actionSheet.title} actions={actionSheet.actions} onCancel={actionSheet.onCancel} />}
