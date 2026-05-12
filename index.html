@@ -125,7 +125,6 @@
         const PATTERN_HK = "香港|香|港"; 
         const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥"; 
         
-        // 核心修复1：更严谨的双网同下识别词库
         const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：和]*[澳门奥])|([澳门奥][\\s.,，;；:：和]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(双面网)|(双网)|(两网)|(各买一遍)", "i");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
         
@@ -323,13 +322,12 @@
             const segments=[]; 
             const lines = smartMergeLines(content.split(/[\n]/).filter(l=>l.trim()));
             
-            // 全局状态机，默认为初始识别结果
+            // 全局状态机
             let globalType = (new RegExp(PATTERN_HK).test(content) && !new RegExp(PATTERN_MO).test(content)) ? 'HK' : 'MO';
 
             lines.forEach(line => {
                 if (REGEX_CHAT_HEADER.test(line)) return;
                 
-                // 核心修复2：多行订单时，严格识别纯标题行以切换“全局上下文状态”
                 if (new RegExp(`^[\\s.,，;；]*(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?\\s*$`).test(line)) {
                     if (new RegExp(PATTERN_HK).test(line)) globalType = 'HK';
                     else globalType = 'MO';
@@ -338,7 +336,6 @@
 
                 let processedLine = line.replace(/(\d)个/g, '$1 '); 
                 
-                // 核心修复3：只在“夹击截断”时插入换行，不盲目替换整个双网词汇
                 const nextBetStart = '(?=[\\s.,，;；]*[\\d鼠牛虎兔龙蛇马羊猴鸡狗猪单双大小合红蓝绿])';
                 const p1 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)[\\s.,，;；]*(香港|香|港)${nextBetStart}`, 'g');
                 const p2 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)(香港|香|港)[\\s.,，;；]*([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)${nextBetStart}`, 'g');
@@ -359,92 +356,87 @@
                 splitParts.forEach(subLine => {
                     if(!subLine.trim()) return;
                     
+                    let startIndex = segments.length;
+                    
                     const regex = /(各|买|=|每|号)/.test(subLine) ? REGEX_AMOUNT_NO_SLASH : REGEX_AMOUNT_WITH_SLASH;
                     const matches = Array.from(subLine.matchAll(regex));
-                    
+
+                    // 整行级别是否为双网
+                    let lineIsDual = REGEX_DUAL.test(subLine);
+
                     if (matches.length === 0) {
-                        // 如果本段没有找到金额，这可能是一个纯号码段，或者是带有双拼指示的尾缀
-                        let chunkIsDual = REGEX_DUAL.test(subLine);
                         let chunkType = globalType;
-                        
-                        // 核心修复4：如果局部包含单一网名，更新“全局状态机”并应用于当前
-                        if (!chunkIsDual) {
+                        if (!lineIsDual) {
                             if (new RegExp(PATTERN_HK).test(subLine)) { chunkType = 'HK'; globalType = 'HK'; }
                             else if (new RegExp(PATTERN_MO).test(subLine)) { chunkType = 'MO'; globalType = 'MO'; }
                         }
 
                         const res = parseContentWithoutAmount(subLine, chunkType, currentYearZodiac);
-                        
                         if (res.totalBetCount > 0 || res.hasUnknown || subLine.trim()) {
                             segments.push({ 
                                 numbers:res.numbers, totalBetCount:res.totalBetCount, amount:parseFloat(defaultAmtStr)||0, 
-                                content:subLine, type:chunkType, isDualBet: chunkIsDual,
+                                content:subLine, type:chunkType, isDualBet: lineIsDual,
                                 isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), rawLine:subLine, 
                                 isSuspicious:(res.totalBetCount>1&&!parseFloat(defaultAmtStr)&&!/[元米斤块]/.test(subLine))||res.hasUnknown, fullLine:line 
                             });
                         }
                     } else {
-                        let cursor=0;
+                        let cursor = 0;
                         matches.forEach(m => {
-                            const amtTxt=m[0], idx=m.index;
-                            const chunkContent=subLine.substring(cursor, idx).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
+                            const amtTxt = m[0], idx = m.index;
+                            const chunkContent = subLine.substring(cursor, idx).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
                             
-                            let amt=0, numM=amtTxt.match(/(\d+(\.\d+)?)/); 
-                            if(numM) amt=parseFloat(numM[0]); 
+                            let amt = 0, numM = amtTxt.match(/(\d+(\.\d+)?)/); 
+                            if(numM) amt = parseFloat(numM[0]); 
                             else { const chM=amtTxt.match(new RegExp(`[${CH_NUM}]+`)); if(chM) amt=parseChineseNumber(chM[0]); }
                             
-                            if(chunkContent){ 
-                                // 核心修复5：局部双拼判断，双拼绝不污染全局状态机
-                                let chunkIsDual = REGEX_DUAL.test(chunkContent) || REGEX_DUAL.test(amtTxt);
+                            if (chunkContent) { 
                                 let chunkType = globalType;
-                                
-                                if (!chunkIsDual) {
+                                if (!lineIsDual) {
                                     if (new RegExp(PATTERN_HK).test(chunkContent)) { chunkType = 'HK'; globalType = 'HK'; }
                                     else if (new RegExp(PATTERN_MO).test(chunkContent)) { chunkType = 'MO'; globalType = 'MO'; }
                                 }
 
-                                const res=parseContentWithoutAmount(chunkContent, chunkType, currentYearZodiac); 
+                                const res = parseContentWithoutAmount(chunkContent, chunkType, currentYearZodiac); 
                                 
                                 segments.push({ 
                                     numbers:res.numbers, totalBetCount:res.totalBetCount, amount:amt, 
-                                    content:chunkContent, type:chunkType, isDualBet: chunkIsDual,
+                                    content:chunkContent, type:chunkType, isDualBet: lineIsDual,
                                     isValid:amt>0 && res.totalBetCount>0, rawLine:chunkContent+amtTxt, 
                                     isSuspicious:(res.totalBetCount>1&&!/[各xX\/元米斤块=每号个]/.test(amtTxt))||res.hasUnknown, fullLine:line 
                                 }); 
                             }
-                            cursor=idx+amtTxt.length;
+                            cursor = idx + amtTxt.length;
                         });
                         
                         const trail = subLine.substring(cursor).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
-                        if(trail){ 
-                            // 尾缀处理（如：8岁各10港澳）
-                            let trailIsDual = REGEX_DUAL.test(trail);
+                        if(trail) { 
                             let trailType = globalType;
-                            let hasExplicitType = false;
-                            
-                            if (!trailIsDual) {
-                                if (new RegExp(PATTERN_HK).test(trail)) { trailType = 'HK'; globalType = 'HK'; hasExplicitType = true; }
-                                else if (new RegExp(PATTERN_MO).test(trail)) { trailType = 'MO'; globalType = 'MO'; hasExplicitType = true; }
+                            if (!lineIsDual) {
+                                if (new RegExp(PATTERN_HK).test(trail)) { trailType = 'HK'; globalType = 'HK'; }
+                                else if (new RegExp(PATTERN_MO).test(trail)) { trailType = 'MO'; globalType = 'MO'; }
                             }
 
-                            const res=parseContentWithoutAmount(trail, trailType, currentYearZodiac); 
+                            const res = parseContentWithoutAmount(trail, trailType, currentYearZodiac); 
                             
-                            if (res.totalBetCount === 0 && segments.length > 0 && (trailIsDual || hasExplicitType)) {
-                                // 尾缀纯指令，作用于上一笔订单
+                            if (res.totalBetCount === 0 && segments.length > startIndex) {
+                                // 将剩余文字附加到最后一个注单
                                 segments[segments.length - 1].rawLine += trail;
-                                if (trailIsDual) { segments[segments.length - 1].isDualBet = true; }
-                                else if (hasExplicitType) {
-                                    segments[segments.length - 1].type = trailType;
-                                    segments[segments.length - 1].isDualBet = false;
-                                }
-                            } else if(res.totalBetCount>0 || res.hasUnknown) {
+                            } else if(res.totalBetCount > 0 || res.hasUnknown) {
                                 segments.push({ 
                                     numbers:res.numbers, totalBetCount:res.totalBetCount, amount:parseFloat(defaultAmtStr)||0, 
-                                    content:trail, type:trailType, isDualBet: trailIsDual, 
+                                    content:trail, type:trailType, isDualBet: lineIsDual, 
                                     isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), rawLine:trail, 
                                     isSuspicious:!parseFloat(defaultAmtStr)||res.hasUnknown, fullLine:line 
                                 }); 
                             }
+                        }
+                    }
+                    
+                    // 如果整行中包含双网词汇（无论是行首、行中、行尾），直接将刚刚解析出的该行所有注单全部标记为双网
+                    if (lineIsDual && segments.length > startIndex) {
+                        for (let i = startIndex; i < segments.length; i++) {
+                            segments[i].isDualBet = true;
                         }
                     }
                 });
@@ -1501,7 +1493,7 @@
                                         <div className="text-xs bg-white px-2 py-1 rounded border border-red-200 font-bold">点击定位</div>
                                     </div>
                                 )}
-                                <div className="bg-white p-2 rounded-xl shadow-sm border border-indigo-50 sticky top-[72px] z-40 flex flex-col gap-2"><div className="flex justify-between items-center"><div className="flex bg-slate-100 rounded-lg p-1"><button onClick={()=>setBookMode('ALL')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${bookMode==='ALL'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}>全部</button><button onClick={()=>setBookMode('SINGLE')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${bookMode==='SINGLE'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}>指定</button></div><div className="text-right"><div className="text-xs text-slate-400">列表总额</div><div className="font-bold text-indigo-600">¥{displayedCustomerStats.reduce((a,c)=>a+c.total,0)}</div></div></div>{bookMode==='SINGLE' && <select value={bookTarget} onChange={e=>setBookTarget(e.target.value)} className="w-full bg-slate-50 border rounded-lg p-2 text-sm font-bold text-slate-700 outline-none">{customers.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select>}</div>{displayedCustomerStats.map(cust => <details key={cust.name} open className="bg-white border rounded-xl shadow-sm overflow-hidden group"><summary className="flex justify-between items-center p-4 cursor-pointer bg-slate-50 group-open:bg-indigo-50 transition-colors"><div className="flex items-center gap-2"><div className="font-bold text-lg text-slate-800">{cust.name}</div></div><div className="font-bold text-indigo-600 text-xl">¥{cust.total}</div></summary><div className="p-3 space-y-3 bg-white border-t border-slate-100">{cust.batches.map((batch,i)=><div id={`batch-${batch.batchId}`} key={batch.batchId} className={`border rounded-lg p-3 transition-colors duration-500 ${batch.isTransferred ? 'bg-gray-100 border-gray-300 opacity-75' : batch.records.some(r=>r.isError)?'bg-red-50 border-red-200 shadow-md ring-1 ring-red-100':'bg-slate-50/50 border-slate-200'}`}><div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200/50"><span className={`font-bold text-sm flex items-center gap-2 ${batch.records.some(r=>r.isError) ? 'text-red-600' : 'text-slate-600'}`}>#{i+1} 笔: ¥{batch.total} {batch.records.some(r=>r.isError) && <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-[10px]">异常</span>} {batch.isTransferred && <span className="bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[10px] border border-gray-300">已转出</span>}</span><div className="flex gap-2"><button onClick={()=>handleTransferBatch(batch.batchId, batch.isTransferred)} className={`text-xs px-2.5 py-1 rounded-md border font-bold shadow-sm btn-press flex items-center gap-1 ${batch.isTransferred ? 'bg-white text-slate-500 border-slate-300' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>{batch.isTransferred ? '恢复' : '转出'}</button><button onClick={(e)=>{e.stopPropagation();setInsertBatchTarget(batch.batchId)}} className="text-xs bg-white text-indigo-600 px-2.5 py-1 rounded-md border border-indigo-200 font-bold shadow-sm btn-press">插</button><button onClick={(e)=>{e.stopPropagation();setBatchToEdit(batch.batchId)}} className="text-xs bg-white text-yellow-600 px-2.5 py-1 rounded-md border border-yellow-200 font-bold shadow-sm btn-press">改</button><button onClick={(e)=>{e.stopPropagation();handleDeleteBatchWithModal(batch.batchId)}} className="text-xs bg-white text-red-600 px-2.5 py-1 rounded-md border border-red-200 font-bold shadow-sm btn-press">删</button></div></div><div className="text-xs font-mono text-slate-600 space-y-1">{batch.records.map((r,ri)=><div key={ri} className="flex justify-between border-b border-slate-100 last:border-0 pb-1 mb-1 items-start"><span className={`break-all flex-1 mr-2 ${r.isError?'text-red-600 font-bold':''}`}>{r.rawInput}{r.type==='HK'&&<span className="text-red-500 ml-1 text-[10px] bg-red-50 px-1 rounded">港</span>}</span><span className="text-slate-400 shrink-0 font-bold">{r.isError?'(异常)':`¥${r.totalAmount}`}</span></div>)}</div></div>)}</div></details>)}</div>}
+                                <div className="bg-white p-2 rounded-xl shadow-sm border border-indigo-50 sticky top-[72px] z-40 flex flex-col gap-2"><div className="flex justify-between items-center"><div className="flex bg-slate-100 rounded-lg p-1"><button onClick={()=>setBookMode('ALL')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${bookMode==='ALL'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}>全部</button><button onClick={()=>setBookMode('SINGLE')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${bookMode==='SINGLE'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}>指定</button></div><div className="text-right"><div className="text-xs text-slate-400">列表总额</div><div className="font-bold text-indigo-600">¥{displayedCustomerStats.reduce((a,c)=>a+c.total,0)}</div></div></div>{bookMode==='SINGLE' && <select value={bookTarget} onChange={e=>setBookTarget(e.target.value)} className="w-full bg-slate-50 border rounded-lg p-2 text-sm font-bold text-slate-700 outline-none">{customers.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select>}</div>{displayedCustomerStats.map(cust => <details key={cust.name} open className="bg-white border rounded-xl shadow-sm overflow-hidden group"><summary className="flex justify-between items-center p-4 cursor-pointer bg-slate-50 group-open:bg-indigo-50 transition-colors"><div className="flex items-center gap-2"><div className="font-bold text-lg text-slate-800">{cust.name}</div><button onClick={(e)=>{e.stopPropagation();setInsertOrderTarget(cust.name)}} className="bg-indigo-100 text-indigo-600 px-2 py-1 rounded text-xs font-bold border border-indigo-200 shadow-sm btn-press flex items-center gap-1"><Icon name="PlusCircle" className="w-4 h-4"/> 插入</button></div><div className="font-bold text-indigo-600 text-xl">¥{cust.total}</div></summary><div className="p-3 space-y-3 bg-white border-t border-slate-100">{cust.batches.map((batch,i)=><div id={`batch-${batch.batchId}`} key={batch.batchId} className={`border rounded-lg p-3 transition-colors duration-500 ${batch.isTransferred ? 'bg-gray-100 border-gray-300 opacity-75' : batch.records.some(r=>r.isError)?'bg-red-50 border-red-200 shadow-md ring-1 ring-red-100':'bg-slate-50/50 border-slate-200'}`}><div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200/50"><span className={`font-bold text-sm flex items-center gap-2 ${batch.records.some(r=>r.isError) ? 'text-red-600' : 'text-slate-600'}`}>#{i+1} 笔: ¥{batch.total} {batch.records.some(r=>r.isError) && <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-[10px]">异常</span>} {batch.isTransferred && <span className="bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[10px] border border-gray-300">已转出</span>}</span><div className="flex gap-2"><button onClick={()=>handleTransferBatch(batch.batchId, batch.isTransferred)} className={`text-xs px-2.5 py-1 rounded-md border font-bold shadow-sm btn-press flex items-center gap-1 ${batch.isTransferred ? 'bg-white text-slate-500 border-slate-300' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>{batch.isTransferred ? '恢复' : '转出'}</button><button onClick={(e)=>{e.stopPropagation();setInsertBatchTarget(batch.batchId)}} className="text-xs bg-white text-indigo-600 px-2.5 py-1 rounded-md border border-indigo-200 font-bold shadow-sm btn-press">插</button><button onClick={(e)=>{e.stopPropagation();setBatchToEdit(batch.batchId)}} className="text-xs bg-white text-yellow-600 px-2.5 py-1 rounded-md border border-yellow-200 font-bold shadow-sm btn-press">改</button><button onClick={(e)=>{e.stopPropagation();handleDeleteBatchWithModal(batch.batchId)}} className="text-xs bg-white text-red-600 px-2.5 py-1 rounded-md border border-red-200 font-bold shadow-sm btn-press">删</button></div></div><div className="text-xs font-mono text-slate-600 space-y-1">{batch.records.map((r,ri)=><div key={ri} className="flex justify-between border-b border-slate-100 last:border-0 pb-1 mb-1 items-start"><span className={`break-all flex-1 mr-2 ${r.isError?'text-red-600 font-bold':''}`}>{r.rawInput}{r.type==='HK'&&<span className="text-red-500 ml-1 text-[10px] bg-red-50 px-1 rounded">港</span>}</span><span className="text-slate-400 shrink-0 font-bold">{r.isError?'(异常)':`¥${r.totalAmount}`}</span></div>)}</div></div>)}</div></details>)}</div>}
                             {/* Risk Tab */}
                             {activeTab === 'risk' && <div className="h-full flex flex-col overflow-hidden"><div className="flex justify-between mb-2 shrink-0"><div className="flex bg-white rounded-lg border p-1 text-xs font-bold shadow-sm"><button onClick={()=>setRiskFilter('MO')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='MO'?'bg-green-500 text-white shadow-sm':'text-slate-500'}`}>澳</button><button onClick={()=>setRiskFilter('HK')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='HK'?'bg-red-500 text-white shadow-sm':'text-slate-500'}`}>港</button><button onClick={()=>setRiskFilter('ALL')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='ALL'?'bg-indigo-500 text-white shadow-sm':'text-slate-500'}`}>全</button></div><button onClick={()=>setShowHedgingModal(true)} className="bg-orange-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-md shadow-orange-200 btn-press"><Icon name="Scale" className="w-4 h-4"/> 智能吃码</button></div><div className="flex-1 overflow-y-auto grid grid-cols-2 gap-3 pb-24">{(riskFilter==='ALL'||riskFilter==='MO')&&<MobileRiskTable title="🇲🇴 澳门" color="green" data={riskStats.mo} total={riskStats.moPool} />}{(riskFilter==='ALL'||riskFilter==='HK')&&<MobileRiskTable title="🇭🇰 香港" color="red" data={riskStats.hk} total={riskStats.hkPool} />}</div></div>}
                             {/* Reconciliation Tab */}
@@ -1509,7 +1501,7 @@
                         </div>
 
                         {/* Modals */}
-                        {batchToEdit && <EditOrderModal batchId={batchToEdit} onClose={()=>setBatchToEdit(null)} onSave={handleSaveEditedBatch} bets={bets} currentYearZodiac={currentYearZodiac} />}
+                        {batchToEdit && <EditOrderModal batchId={batchToEdit} onClose={()=>setBatchToEdit(null)} onSave={handleSaveEditedBatch} onInsertNew={handleInsertBatchAfter} bets={bets} currentYearZodiac={currentYearZodiac} />}
                         {viewingRawBatch && <RawRecordModal batch={viewingRawBatch} onClose={()=>setViewingRawBatch(null)} />}
                         
                         {/* 传入新增的 hedgingHistory */}
@@ -1599,4 +1591,3 @@
     </script>
 </body>
 </html>
-```eof
