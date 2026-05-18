@@ -19,7 +19,6 @@
                 }
             }
             try { checkDomain(); } catch (e) { window.stop(); }
-            
             // 修复：放开输入框的鼠标右键限制，允许粘贴复制
             document.addEventListener('contextmenu', e => {
                 if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
@@ -134,10 +133,11 @@
         const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：和]*[澳门奥])|([澳门奥][\\s.,，;；:：和]*[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(双面网)|(双网)|(两网)|(各买一遍)", "i");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
         
+        // 核心修复1：修改带x后缀的匹配规则，加入(?!\d)防粘连，防止将类似 "05x10" 中的 "05x" 误吞为独立金额
         const BASE_AMOUNT_PARTS = [
             `((每个号各|每个号|每号各|每个|每号|个号|各|买|x|X|号|=|每)[\\s.．。、…~＇'-]*(?:\\d+(?:\\.\\d+)?[\\s.．。、…~＇']*[${UNITS}]|\\d+))`, 
             `(\\d+(?:\\.\\d+)?[\\s.．。、…~＇']*[${UNITS}])`, 
-            `(\\d+(?:\\.\\d+)?x)`, 
+            `(\\d+(?:\\.\\d+)?[xX](?!\\d))`, 
             `((每个|每号|个号|个|各|买|x|X|号|=|每)[\\s.．。、…~＇'-]*[${CH_NUM}]+[\\s.．。、…~＇']*[${UNITS}]?)`, 
             `([${CH_NUM}]+[\\s.．。、…~＇']*[${UNITS}])`, 
             `((?<=[\\d\\s])[${CH_NUM}]+(?!([岁尾头])))`, 
@@ -168,20 +168,17 @@
 
         const parseChineseNumber = (s) => { const map={'零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000}; if(s.length===1 && map[s]!==undefined && map[s]<10) return map[s]; let res=0, curr=0; for(let i=0;i<s.length;i++){ const val=map[s[i]]; if(val>=10){ if(curr===0)curr=1; res+=curr*val; curr=0; } else if(val!==undefined) curr=val; } return (res+curr)||NaN; };
         
-        // 核心修复1：更严格的段落合并机制。防止香港和澳门的内容因为误判而被合并，或者强制把合规的连续句子切断。
         const smartMergeLines = (lines) => { 
             const merged=[]; let pending=""; 
             lines.forEach(line => { 
                 const clean = line.trim(); 
                 if (!clean) return; 
-                
-                // 遇到明确的“段落头部（带冒号或独立一行）”，强制换行，切断合并
-                if (/^([香港澳门奥]|新澳门|老澳门)[:：]/.test(clean) || REGEX_CHAT_HEADER.test(clean)) {
+                // 纯标题行不合并，保留独立性
+                if (REGEX_CHAT_HEADER.test(clean) || new RegExp(`^(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?$`).test(clean)) { 
                     if (pending) { merged.push(pending); pending=""; } 
                     merged.push(clean); 
                     return; 
-                }
-                
+                } 
                 pending += (pending && !/^[岁尾头]/.test(clean) ? " " : "") + clean; 
             }); 
             if (pending) merged.push(pending); 
@@ -338,11 +335,7 @@
                 if (REGEX_CHAT_HEADER.test(line)) return;
                 
                 // 1. 严格识别纯标题行以切换“全局上下文状态”
-                const headerMatch = line.match(/^([香港澳门奥]|新澳门|老澳门)[:：]/);
-                if (headerMatch) {
-                    if (new RegExp(PATTERN_HK).test(headerMatch[1])) { globalType = 'HK'; }
-                    else { globalType = 'MO'; }
-                } else if (new RegExp(`^[\\s.,，;；]*(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?\\s*$`).test(line)) {
+                if (new RegExp(`^[\\s.,，;；]*(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?\\s*$`).test(line)) {
                     if (new RegExp(PATTERN_HK).test(line)) globalType = 'HK';
                     else globalType = 'MO';
                     return;
@@ -350,6 +343,7 @@
 
                 let processedLine = line.replace(/(\d)个/g, '$1 '); 
                 
+                // 2. 只在“夹击截断”时插入换行
                 const nextBetStart = '(?=[\\s.,，;；]*[\\d鼠牛虎兔龙蛇马羊猴鸡狗猪单双大小合红蓝绿])';
                 const p1 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)[\\s.,，;；]*(香港|香|港)${nextBetStart}`, 'g');
                 const p2 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)(香港|香|港)[\\s.,，;；]*([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)${nextBetStart}`, 'g');
@@ -363,27 +357,25 @@
                 
                 processedLine = processedLine.replace(/(\d+(?:[.,，;；、]+\d+){2,})\s*([元米斤块])/g, '$1 ERROR_AMOUNT_MISSING ');
                 
-                // 核心修复2：移除导致错误断行的干扰规则
-                // processedLine = processedLine.replace(/((?:每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)\s*[\d零一二三四五六七八九十百千]+(?:[\.]\d+)?[元米斤块]?)\s*[，,;；]\s*/g, '$1\n');
-                // processedLine = processedLine.replace(/(\d+(\.\d+)?\s*[/]\s*\d+(\.\d+)?)\s*[，,;；]\s*/g, '$1\n');
-                
                 let splitParts = processedLine.split(processedLine.includes('\n')?'\n':(processedLine.includes('另外')?'另外':/a^/));
                 
                 splitParts.forEach(subLine => {
                     if(!subLine.trim()) return;
                     
                     let startIndex = segments.length;
+                    let didContribute = false; // 兜底机制：记录本句是否成功提取了订单
                     
                     const regex = /(各|买|=|每|号)/.test(subLine) ? REGEX_AMOUNT_NO_SLASH : REGEX_AMOUNT_WITH_SLASH;
                     const matches = Array.from(subLine.matchAll(regex));
 
+                    // 整行级别是否为双网
                     let lineIsDual = REGEX_DUAL.test(subLine);
 
                     if (matches.length === 0) {
                         let chunkType = globalType;
                         if (!lineIsDual) {
-                            if (new RegExp(PATTERN_HK).test(subLine)) { chunkType = 'HK'; }
-                            else if (new RegExp(PATTERN_MO).test(subLine)) { chunkType = 'MO'; }
+                            if (new RegExp(PATTERN_HK).test(subLine)) { chunkType = 'HK'; globalType = 'HK'; }
+                            else if (new RegExp(PATTERN_MO).test(subLine)) { chunkType = 'MO'; globalType = 'MO'; }
                         }
 
                         const res = parseContentWithoutAmount(subLine, chunkType, currentYearZodiac);
@@ -394,9 +386,11 @@
                                 isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), rawLine:subLine, 
                                 isSuspicious:(res.totalBetCount>1&&!parseFloat(defaultAmtStr)&&!/[元米斤块]/.test(subLine))||res.hasUnknown, fullLine:line 
                             });
+                            didContribute = true;
                         }
                     } else {
                         let cursor = 0;
+                        // 记录该行开头是否就带有双网属性，若有，则“前向传染”给本段落所有号码
                         let forwardDual = false;
                         let forwardType = null;
 
@@ -409,14 +403,15 @@
                             else { const chM=amtTxt.match(new RegExp(`[${CH_NUM}]+`)); if(chM) amt=parseChineseNumber(chM[0]); }
                             
                             if (chunkContent) { 
+                                // 判断当前块是否为双网
                                 let chunkIsDual = REGEX_DUAL.test(chunkContent) || REGEX_DUAL.test(amtTxt);
                                 let chunkType = globalType;
                                 
                                 if (chunkIsDual) {
-                                    forwardDual = true; 
+                                    forwardDual = true; // 触发前向传染
                                 } else if (!forwardDual) {
-                                    if (new RegExp(PATTERN_HK).test(chunkContent)) { chunkType = 'HK'; forwardType = 'HK'; }
-                                    else if (new RegExp(PATTERN_MO).test(chunkContent)) { chunkType = 'MO'; forwardType = 'MO'; }
+                                    if (new RegExp(PATTERN_HK).test(chunkContent)) { chunkType = 'HK'; globalType = 'HK'; forwardType = 'HK'; }
+                                    else if (new RegExp(PATTERN_MO).test(chunkContent)) { chunkType = 'MO'; globalType = 'MO'; forwardType = 'MO'; }
                                 }
                                 
                                 if (forwardDual) chunkIsDual = true;
@@ -430,10 +425,12 @@
                                     isValid:amt>0 && res.totalBetCount>0, rawLine:chunkContent+amtTxt, 
                                     isSuspicious:(res.totalBetCount>1&&!/[各xX\/元米斤块=每号个]/.test(amtTxt))||res.hasUnknown, fullLine:line 
                                 }); 
+                                didContribute = true;
                             }
                             cursor = idx + amtTxt.length;
                         });
                         
+                        // 结尾剩余内容处理（如：香港，奥门各买一遍）
                         const trail = subLine.substring(cursor).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
                         if(trail) { 
                             let trailIsDual = REGEX_DUAL.test(trail);
@@ -441,12 +438,13 @@
                             let hasExplicitType = false;
                             
                             if (!trailIsDual) {
-                                if (new RegExp(PATTERN_HK).test(trail)) { trailType = 'HK'; hasExplicitType = true; }
-                                else if (new RegExp(PATTERN_MO).test(trail)) { trailType = 'MO'; hasExplicitType = true; }
+                                if (new RegExp(PATTERN_HK).test(trail)) { trailType = 'HK'; globalType = 'HK'; hasExplicitType = true; }
+                                else if (new RegExp(PATTERN_MO).test(trail)) { trailType = 'MO'; globalType = 'MO'; hasExplicitType = true; }
                             }
 
                             const res = parseContentWithoutAmount(trail, trailType, currentYearZodiac); 
                             
+                            // 核心修复4：如果行尾发现了双网标识，直接【回溯修改】这整段刚刚解析出的订单！
                             if (res.totalBetCount === 0 && segments.length > startIndex && (trailIsDual || hasExplicitType)) {
                                 for (let i = startIndex; i < segments.length; i++) {
                                     if (i === segments.length - 1) segments[i].rawLine += trail;
@@ -457,6 +455,7 @@
                                         segments[i].isDualBet = false;
                                     }
                                 }
+                                didContribute = true;
                             } else if(res.totalBetCount > 0 || res.hasUnknown) {
                                 segments.push({ 
                                     numbers:res.numbers, totalBetCount:res.totalBetCount, amount:parseFloat(defaultAmtStr)||0, 
@@ -464,15 +463,26 @@
                                     isValid:res.totalBetCount>0&&(parseFloat(defaultAmtStr)>0), rawLine:trail, 
                                     isSuspicious:!parseFloat(defaultAmtStr)||res.hasUnknown, fullLine:line 
                                 }); 
+                                didContribute = true;
                             }
                         }
                     }
                     
-                    // 核心修复3：如果整行开头就定调为双网，或者发生了前向传染，那么不仅这行全覆盖，还绝不让后续段落乱串
+                    // 如果整行中包含双网词汇（无论是行首、行中、行尾），直接将刚刚解析出的该行所有注单全部标记为双网
                     if (lineIsDual && segments.length > startIndex) {
                         for (let i = startIndex; i < segments.length; i++) {
                             segments[i].isDualBet = true;
                         }
+                    }
+
+                    // 核心防漏兜底：如果这一行走完全部流程都没有提取出有效内容，强制标记为异常报错卡片！
+                    if (!didContribute) {
+                        segments.push({ 
+                            numbers: [], totalBetCount: 0, amount: 0, 
+                            content: subLine, type: globalType, isDualBet: false,
+                            isValid: false, rawLine: subLine, 
+                            isSuspicious: true, fullLine: line, hasUnknown: true 
+                        });
                     }
                 });
             });
@@ -1504,14 +1514,7 @@
                                                     <div key={i} className="mb-2 last:mb-0">
                                                         <div className="font-bold text-slate-400 px-1">{b.header}</div>
                                                         {b.mismatch && <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded mb-2 flex items-center gap-2 animate-fade-in font-bold"><Icon name="AlertTriangle" className="w-4 h-4 text-red-500"/><span>客户标额 {b.clientTotalVal} ≠ 系统计算 {b.systemTotal}</span></div>}
-                                                        {b.segments.map((s,j) => (<div key={j} className={`p-1.5 rounded mb-1 flex justify-between items-center ${!s.isValid||s.isSuspicious ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-white border border-slate-200 text-slate-700'}`}>
-                                                            <span className="break-all flex-1 mr-2">
-                                                                {s.rawLine} 
-                                                                {s.isDualBet ? <span className="text-indigo-500 ml-1 text-[10px] bg-indigo-50 border border-indigo-200 px-1 rounded">双面</span> : (s.type==='HK'?<span className="text-red-500 ml-1 text-[10px] bg-red-50 border border-red-200 px-1 rounded">港</span>:<span className="text-green-600 ml-1 text-[10px] bg-green-50 border border-green-200 px-1 rounded">澳</span>)}
-                                                                {s.hasUnknown && <span className="text-red-500 font-bold ml-1">(?)</span>}
-                                                            </span>
-                                                            <span className="font-bold opacity-50">¥{s.amount*s.totalBetCount}</span>
-                                                        </div>))}
+                                                        {b.segments.map((s,j) => (<div key={j} className={`p-1.5 rounded mb-1 flex justify-between items-center ${!s.isValid||s.isSuspicious ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-white border border-slate-200 text-slate-700'}`}><span className="break-all flex-1 mr-2">{s.rawLine} {s.isDualBet ? <span className="text-indigo-500 ml-1 text-[10px] bg-indigo-50 border border-indigo-200 px-1 rounded">双面</span> : (s.type==='HK'?<span className="text-red-500 ml-1 text-[10px] bg-red-50 border border-red-200 px-1 rounded">港</span>:<span className="text-green-600 ml-1 text-[10px] bg-green-50 border border-green-200 px-1 rounded">澳</span>)} {s.hasUnknown && <span className="text-red-500 font-bold ml-1">(?)</span>}</span><span className="font-bold opacity-50">¥{s.amount*s.totalBetCount}</span></div>))}
                                                     </div>
                                                 ))}
                                             </div>
