@@ -129,8 +129,8 @@
         const PATTERN_HK = "香港|香|港"; 
         const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥"; 
         
-        // 核心修复1：限制双网词之间的标点数量，防止长标点（如......）被误认为双拼
-        const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：和]{0,2}[澳门奥])|([澳门奥][\\s.,，;；:：和]{0,2}[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(双面网)|(双网)|(两网)", "i");
+        // 限制标点符号的长度，防止奥门......香港被误切
+        const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：和]{0,2}[澳门奥])|([澳门奥][\\s.,，;；:：和]{0,2}[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(双面网)|(双网)|(两网)|(各买一遍)", "i");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
         
         const BASE_AMOUNT_PARTS = [
@@ -144,7 +144,7 @@
         ].join("|");
         const REGEX_AMOUNT_NO_SLASH = new RegExp(BASE_AMOUNT_PARTS, 'gi');
         const REGEX_AMOUNT_WITH_SLASH = new RegExp(`${BASE_AMOUNT_PARTS}|(\\/[\\s.．。…~＇']*\\d+(\\.\\d+)?\\s*[${UNITS}]?)`, 'gi');
-        
+
         // 智能微信聊天头部识别：行尾是冒号，且前面**不包含**下注动作相关的词
         const isChatHeader = (text) => {
             const cleanText = text.trim();
@@ -209,14 +209,14 @@
             txt = txt.replace(/各?\s*[一1]?\s*遍/g, ' ');
             txt = txt.replace(/(香门)|(港门)|(门香)/g, ' '); 
             
-            // 核心修复2：处理多余的“元元”、“块块”等手误，以及处理金额前面带单位的手误，如“各元10”
+            // 核心修复：处理多余的“元元”手误
             txt = txt.replace(/([元米斤块]){2,}/g, '$1');
             txt = txt.replace(/(各|买|每)[元米斤块]\s*(\d+(\.\d+)?)/g, '$1$2');
 
             txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/(\d+)\s*[.,，;；*]+\s*(?:各)?\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
             txt = txt.replace(/(\d+)[.．。…~＇' -]*\s*到\s*[.．。…~＇' -]*(\d+)/g, (m,s,e) => { const n1=parseInt(s),n2=parseInt(e); return (n1<n2&&n2-n1<49) ? Array.from({length:n2-n1+1},(_,i)=>n1+i).join(' ') : m; });
             
-            txt = txt.replace(new RegExp(`((?:\\d+[\\s.,，;；、*\\/。．…~＇' -]+)+\\d+)[\\s.,，;；、*\\/。．…~＇' -]*(?:各)?\\s*(岁|尾|头)`, 'g'), (m,n,s)=> {
+            txt = txt.replace(new RegExp(`((?:\\d+[\\s.,，;；、*\\/。．…~＇' \\-—–−]+)+\\d+)[\\s.,，;；、*\\/。．…~＇' \\-—–−]*(?:各)?\\s*(岁|尾|头)`, 'g'), (m,n,s)=> {
                 const parts = n.split(/([^\d]+)/).filter(x=>x); 
                 const tokens = [];
                 parts.forEach(p => {
@@ -228,7 +228,7 @@
                 });
 
                 const isStrictValid = (strText, sType) => {
-                    if (strText.includes('.')) return false; // 岁尾头不应该包含小数
+                    if (strText.includes('.')) return false; 
                     const v = parseInt(strText);
                     if (strText.length >= 2 && strText.startsWith('0')) return false;
                     if (sType === '岁' && v >= 1 && v <= 12) return true;
@@ -242,7 +242,6 @@
                     if (tokens[i].type === 'num') {
                         const text = tokens[i].text;
                         
-                        // 先判断强分隔符是否阻断传染
                         if (applySuffix && i < tokens.length - 1) {
                             const sepAfter = tokens[i+1].text;
                             const isStrongSep = /[.,，。;；、*\/．…~＇'\-—–−]{2,}/.test(sepAfter.replace(/\s/g, ''));
@@ -267,12 +266,10 @@
                             if (isStrictValid(text, s)) {
                                 tokens[i].text = text + s;
                             } else {
-                                // 核心修复：遇到超出范围的数字，只有当它是紧挨着后缀的那个（手误敲错）时，才强制挂载触发报错
-                                // 防止向左跨越隔离带误伤像 "18" 这样的合法散码
                                 if (i === tokens.length - 1) {
                                     tokens[i].text = text + s;
                                 }
-                                applySuffix = false; // 阻断继续向左传染
+                                applySuffix = false; 
                             }
                         }
                     }
@@ -354,11 +351,13 @@
             const segments=[]; 
             const lines = smartMergeLines(content.split(/[\n]/).filter(l=>l.trim()));
             
+            // 全局状态机，默认为初始识别结果
             let globalType = (new RegExp(PATTERN_HK).test(content) && !new RegExp(PATTERN_MO).test(content)) ? 'HK' : 'MO';
 
             lines.forEach(line => {
                 if (isChatHeader(line)) return;
                 
+                // 1. 严格识别纯标题行以切换“全局上下文状态”
                 if (new RegExp(`^[\\s.,，;；]*(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?\\s*$`).test(line)) {
                     if (new RegExp(PATTERN_HK).test(line)) globalType = 'HK';
                     else globalType = 'MO';
@@ -367,8 +366,18 @@
 
                 let processedLine = line.replace(/(\d)个/g, '$1 '); 
                 
-                processedLine = processedLine.replace(/(\d+(?:[.,，;；、]+\d+){2,})\s*([元米斤块])/g, '$1 ERROR_AMOUNT_MISSING ');
+                // 2. 核心算法：精准夹击切割 (Sandwich Cut)
+                const nextBetStart = '(?=[\\s.,，;；]*[\\d鼠牛虎兔龙蛇马羊猴鸡狗猪单双大小合红蓝绿])';
+                const p1 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)[\\s.,，;；]*(香港|香|港)${nextBetStart}`, 'g');
+                const p2 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)(香港|香|港)[\\s.,，;；]*([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)${nextBetStart}`, 'g');
 
+                processedLine = processedLine.replace(p1, '$1$2\n$3');
+                processedLine = processedLine.replace(p2, '$1$2\n$3');
+                
+                processedLine = processedLine.replace(/(\d+(?:[.,，;；、]+\d+){2,})\s*([元米斤块])/g, '$1 ERROR_AMOUNT_MISSING ');
+                processedLine = processedLine.replace(/((?:每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)\s*[\d零一二三四五六七八九十百千]+(?:[\.]\d+)?[元米斤块]?)\s*[，,;；]\s*/g, '$1\n');
+                processedLine = processedLine.replace(/(\d+(\.\d+)?\s*[/]\s*\d+(\.\d+)?)\s*[，,;；]\s*/g, '$1\n');
+                
                 let splitParts = processedLine.split(processedLine.includes('\n')?'\n':(processedLine.includes('另外')?'另外':/a^/));
                 
                 splitParts.forEach(subLine => {
@@ -390,7 +399,6 @@
 
                         const res = parseContentWithoutAmount(subLine, chunkType, currentYearZodiac);
                         
-                        // 强制兜底：如果没匹配出任何有效内容，且不是单独的网名，强行打上异常标签，绝不丢弃
                         if (res.totalBetCount === 0 && subLine.trim() && !new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})$`).test(subLine.trim())) {
                             res.hasUnknown = true;
                         }
@@ -531,10 +539,10 @@
             }); 
             
             const renderHighlightedTokens = (text) => { 
-                const tokens = text.split(new RegExp(`([\\s.,，;；、*\\/。．…~＇' \\-—–−]+|[${ZODIAC_LIST.join('')}])`)); 
+                const tokens = text.split(new RegExp(`([\\s.,，;；、*\\/。．…~＇' -]+|[${ZODIAC_LIST.join('')}])`)); 
                 return tokens.map((t, idx) => { 
                     if (!t) return null; 
-                    if (/^[.,，;；、*\/。．…~＇' \-—–−]+$/.test(t)) return <span key={idx} className="text-slate-400">{t}</span>; 
+                    if (/^[.,，;；、*\/。．…~＇' -]+$/.test(t)) return <span key={idx} className="text-slate-400">{t}</span>; 
                     let isValid = !isNaN(parseInt(t)) ? (parseInt(t)>=1&&parseInt(t)<=49) : (KEYWORDS[t.toUpperCase()] || ZODIAC_LIST.includes(t) || /^[岁尾头]$/.test(t.slice(-1)) || ['各','买','x','X','号','=','每','元','米','斤','块','个','个号'].some(k=>t.includes(k)) || /^合(数)?\d+$/.test(t) || t === 'ERROR_AMOUNT_MISSING'); 
                     return <span key={idx} className={`inline-block px-1 rounded mx-0.5 ${isValid && t !== 'ERROR_AMOUNT_MISSING' ?'bg-green-100 text-green-800':'bg-red-600 text-white font-bold'}`}>{t}</span>; 
                 }); 
@@ -1253,7 +1261,7 @@
                 const txt = inputContent.trim();
                 if (!txt) { setPreviewBatches([]); return; }
                 const blocks=[]; let curHead='', curLines=[];
-                txt.split('\n').forEach(l => { const isH=isChatHeader(l); if(isH){if(curLines.length)blocks.push({header:curHead,text:curLines.join('\n')});curHead=l.trim();curLines=[];} else if(l.trim())curLines.push(l); });
+                txt.split('\n').forEach(l => { const isH=isChatHeader(l)&&!new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})[:：]`).test(l); if(isH){if(curLines.length)blocks.push({header:curHead,text:curLines.join('\n')});curHead=l.trim();curLines=[];} else if(l.trim())curLines.push(l); });
                 if(curLines.length) blocks.push({header:curHead,text:curLines.join('\n')});
                 const previews = blocks.map(b => {
                     const segments = parseContentForSegments(b.text, defaultAmount, currentYearZodiac).filter(s=>s.totalBetCount>0 || s.isSuspicious);
@@ -1505,28 +1513,6 @@
                 }
             };
 
-            const handleLoginSuccess = async (code, initialData) => {
-                const newSid = Math.random().toString(36).substring(2) + Date.now().toString(36);
-                if (window.isFirebaseReady && !window.isLocalMode) {
-                    await window.fb.updateDoc(window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", code)), { currentSessionId: newSid });
-                }
-                localStorage.setItem('lottery_user_code', code); localStorage.setItem('lottery_session_id', newSid);
-                setUserCode(code); setSessionID(newSid);
-                if(initialData) {
-                    setBets(initialData.bets || []);
-                    setCustomers(initialData.customers || []);
-                    setTransfers(initialData.transfers || { hk: {}, mo: {} });
-                    setHedgingHistory(initialData.hedgingHistory || []);
-                    if(initialData.customers && initialData.customers.length > 0) setTempCustomers(initialData.customers);
-                    else setTempCustomers([{id:'def_1',name:'张三',odds:'47.5',rebateStr:'2',aliases:[]}]);
-                }
-            };
-            const handleLogout = () => { 
-                localStorage.removeItem('lottery_user_code'); localStorage.removeItem('lottery_session_id'); 
-                setUserCode(null); setSessionID(null); setBets([]); setCustomers([]); setTransfers({ hk: {}, mo: {} });
-                setHedgingHistory([]);
-            };
-            
             const handleClearClick = () => setActionSheet({ 
                 title: "数据管理", 
                 actions: [ 
@@ -1591,6 +1577,28 @@
                     return () => clearTimeout(timer);
                 }
             }, [activeTab, focusBatchId, displayedCustomerStats]);
+
+            const handleLoginSuccess = async (code, initialData) => {
+                const newSid = Math.random().toString(36).substring(2) + Date.now().toString(36);
+                if (window.isFirebaseReady && !window.isLocalMode) {
+                    await window.fb.updateDoc(window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", code)), { currentSessionId: newSid });
+                }
+                localStorage.setItem('lottery_user_code', code); localStorage.setItem('lottery_session_id', newSid);
+                setUserCode(code); setSessionID(newSid);
+                if(initialData) {
+                    setBets(initialData.bets || []);
+                    setCustomers(initialData.customers || []);
+                    setTransfers(initialData.transfers || { hk: {}, mo: {} });
+                    setHedgingHistory(initialData.hedgingHistory || []);
+                    if(initialData.customers && initialData.customers.length > 0) setTempCustomers(initialData.customers);
+                    else setTempCustomers([{id:'def_1',name:'张三',odds:'47.5',rebateStr:'2',aliases:[]}]);
+                }
+            };
+            const handleLogout = () => { 
+                localStorage.removeItem('lottery_user_code'); localStorage.removeItem('lottery_session_id'); 
+                setUserCode(null); setSessionID(null); setBets([]); setCustomers([]); setTransfers({ hk: {}, mo: {} });
+                setHedgingHistory([]);
+            };
 
             if (!userCode && !isAdmin) return <ErrorBoundary><LoginScreen onLogin={handleLoginSuccess} onAdmin={()=>setIsAdmin(true)} /></ErrorBoundary>;
             if (isAdmin) return <ErrorBoundary><AdminPanel onClose={()=>setIsAdmin(false)} db={window.db}/></ErrorBoundary>;
@@ -1659,7 +1667,6 @@
                         {batchToEdit && <EditOrderModal batchId={batchToEdit} onClose={()=>setBatchToEdit(null)} onSave={handleSaveEditedBatch} onInsertNew={handleInsertBatchAfter} bets={bets} currentYearZodiac={currentYearZodiac} />}
                         {viewingRawBatch && <RawRecordModal batch={viewingRawBatch} onClose={()=>setViewingRawBatch(null)} />}
                         
-                        {/* 传入新增的 hedgingHistory */}
                         {showHedgingModal && <HedgingModal onClose={()=>setShowHedgingModal(false)} riskStats={riskStats} riskFilter={riskFilter} customers={customers} bets={bets} showAlert={showAlert} transfers={transfers} onSaveTransfers={handleSaveTransfers} hedgingHistory={hedgingHistory} setHedgingHistory={setHedgingHistory} setConfirmation={setConfirmation} />}
                         
                         {insertOrderTarget && <InsertOrderModal customerName={insertOrderTarget} onClose={()=>setInsertOrderTarget(null)} onSave={handleInsertBatchFromModal} />}
@@ -1669,7 +1676,7 @@
                         {actionSheet && <ActionSheet title={actionSheet.title} actions={actionSheet.actions} onCancel={actionSheet.onCancel} />}
                         {showSettings && <div id="app-modal" className="flex items-center justify-center p-4 animate-fade-in"><div className="bg-white w-full max-w-lg rounded-xl p-4 max-h-[80vh] overflow-y-auto"><div className="flex justify-between items-center mb-4 pb-2 border-b"><h3 className="font-bold text-lg">客户管理</h3><button onClick={()=>setShowSettings(false)} className="btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button></div><div className="space-y-2">{tempCustomers.map(c=><div key={c.id} className="flex gap-2 items-center"><input value={c.name} onChange={e=>handleUpdateCustomerField(c.id,'name',e.target.value)} className="border p-2 rounded w-24 text-sm" placeholder="姓名"/><input type="text" inputMode="decimal" value={c.odds} onChange={e=>handleUpdateCustomerField(c.id,'odds',e.target.value)} className="border p-2 rounded w-16 text-sm" placeholder="赔率"/><input type="text" inputMode="decimal" value={c.rebateStr} onChange={e=>handleUpdateCustomerField(c.id,'rebateStr',e.target.value)} className="border p-2 rounded w-16 text-sm" placeholder="退水%"/><button onClick={()=>setTempCustomers(prev=>prev.filter(x=>x.id!==c.id))} className="btn-press"><Icon name="Trash2" className="w-5 h-5 text-red-500"/></button></div>)}</div><div className="mt-4 flex gap-2"><button onClick={()=>setTempCustomers([...tempCustomers, {id:Math.random().toString(),name:'',customerType:'客户',odds:'47.5',rebateStr:'2',aliases:[]}])} className="flex-1 bg-green-500 text-white py-2 rounded font-bold btn-press">新增客户</button><button onClick={handleSaveCustomers} className="flex-1 bg-blue-500 text-white py-2 rounded font-bold btn-press">保存设置</button></div></div></div>}
                         
-                        {/* --- 修改后的全屏文本预览/复制页面 --- */}
+                        {/* --- 全屏文本预览/复制页面 --- */}
                         {textPreview && (
                             <div className="fixed inset-0 z-[6000] bg-white flex flex-col animate-fade-in">
                                 {/* 顶部栏 */}
@@ -1705,7 +1712,7 @@
                                         <button onClick={()=>setPreviewFontSize(s=>Math.min(24, s+1))} className="w-8 h-8 flex items-center justify-center bg-white border rounded text-sm font-bold text-slate-600 shadow-sm">A+</button>
                                     </div>
                                     <textarea 
-                                        id="preview-text" /* 关键 ID，用于绕过全局 CSS 限制 */
+                                        id="preview-text" 
                                         className="flex-1 w-full p-4 font-mono leading-relaxed resize-none outline-none text-slate-700 bg-white" 
                                         value={textPreview.content} 
                                         onChange={e=>setTextPreview({...textPreview,content:e.target.value})}
