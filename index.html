@@ -336,6 +336,20 @@
         };
 
         const parseContentForSegments = (text, defaultAmtStr, currentYearZodiac) => {
+            const PURE_NET_PREFIX = "(?:[买下打去]?\\s*)";
+            const HK_REGEX_STR = `${PATTERN_HK}|香|港`;
+            const MO_REGEX_STR = `${PATTERN_MO}|澳|门|奥|新澳门|老澳门`;
+            const DUAL_REGEX_STR = "香门|港门|香奥|港奥|港澳|澳港|双面网|双网|两网|各买一遍";
+
+            const isPureNetStr = (str, type) => {
+                const clean = str.trim().replace(/^[.,，;；:：]+|[.,，;；:：]+$/g, '');
+                if (!clean) return false;
+                if (type === 'DUAL') return new RegExp(`^${PURE_NET_PREFIX}(${DUAL_REGEX_STR}|([香港][\\s.,，;；:：和]{0,2}[澳门奥])|([澳门奥][\\s.,，;；:：和]{0,2}[香港]))$`, 'i').test(clean);
+                if (type === 'HK') return new RegExp(`^${PURE_NET_PREFIX}(${HK_REGEX_STR})$`, 'i').test(clean) && !new RegExp(`(${MO_REGEX_STR})`, 'i').test(clean);
+                if (type === 'MO') return new RegExp(`^${PURE_NET_PREFIX}(${MO_REGEX_STR})$`, 'i').test(clean) && !new RegExp(`(${HK_REGEX_STR})`, 'i').test(clean);
+                return false;
+            };
+
             let clientTotalStr = '';
             let clientTotalNum = null;
             const content = text.replace(REGEX_CLIENT_TOTAL, m => { 
@@ -351,22 +365,25 @@
             const segments=[]; 
             const lines = smartMergeLines(content.split(/[\n]/).filter(l=>l.trim()));
             
-            // 全局状态机，默认为初始识别结果
             let globalType = (new RegExp(PATTERN_HK).test(content) && !new RegExp(PATTERN_MO).test(content)) ? 'HK' : 'MO';
+            let globalDual = false;
 
             lines.forEach(line => {
                 if (isChatHeader(line)) return;
                 
-                // 1. 严格识别纯标题行以切换“全局上下文状态”
-                if (new RegExp(`^[\\s.,，;；]*(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?\\s*$`).test(line)) {
-                    if (new RegExp(PATTERN_HK).test(line)) globalType = 'HK';
+                if (isPureNetStr(line, 'DUAL')) {
+                    globalDual = true;
+                    return;
+                }
+                if (isPureNetStr(line, 'HK') || isPureNetStr(line, 'MO')) {
+                    globalDual = false; 
+                    if (isPureNetStr(line, 'HK')) globalType = 'HK';
                     else globalType = 'MO';
                     return;
                 }
 
                 let processedLine = line.replace(/(\d)个/g, '$1 '); 
                 
-                // 2. 核心算法：精准夹击切割 (Sandwich Cut)
                 const nextBetStart = '(?=[\\s.,，;；]*[\\d鼠牛虎兔龙蛇马羊猴鸡狗猪单双大小合红蓝绿])';
                 const p1 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)[\\s.,，;；]*(香港|香|港)${nextBetStart}`, 'g');
                 const p2 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)(香港|香|港)[\\s.,，;；]*([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)${nextBetStart}`, 'g');
@@ -380,6 +397,10 @@
                 
                 let splitParts = processedLine.split(processedLine.includes('\n')?'\n':(processedLine.includes('另外')?'另外':/a^/));
                 
+                let lineForwardDual = globalDual;
+                let lineForwardType = globalType;
+                let lineStartIndex = segments.length;
+
                 splitParts.forEach(subLine => {
                     if(!subLine.trim()) return;
                     
@@ -388,18 +409,39 @@
                     const regex = /(各|买|=|每|号)/.test(subLine) ? REGEX_AMOUNT_NO_SLASH : REGEX_AMOUNT_WITH_SLASH;
                     const matches = Array.from(subLine.matchAll(regex));
 
-                    let lineIsDual = REGEX_DUAL.test(subLine);
-
                     if (matches.length === 0) {
-                        let chunkType = globalType;
-                        if (!lineIsDual) {
-                            if (new RegExp(PATTERN_HK).test(subLine)) { chunkType = 'HK'; globalType = 'HK'; }
-                            else if (new RegExp(PATTERN_MO).test(subLine)) { chunkType = 'MO'; globalType = 'MO'; }
+                        if (isPureNetStr(subLine, 'DUAL') || isPureNetStr(subLine, 'HK') || isPureNetStr(subLine, 'MO')) {
+                            let finalType = 'MO';
+                            let isDual = false;
+                            if (isPureNetStr(subLine, 'DUAL')) {
+                                lineForwardDual = true; globalDual = true; isDual = true;
+                            } else if (isPureNetStr(subLine, 'HK')) {
+                                lineForwardDual = false; globalDual = false; lineForwardType = 'HK'; globalType = 'HK'; finalType = 'HK';
+                            } else {
+                                lineForwardDual = false; globalDual = false; lineForwardType = 'MO'; globalType = 'MO'; finalType = 'MO';
+                            }
+                            
+                            for(let i = lineStartIndex; i < segments.length; i++) {
+                                if (isDual) segments[i].isDualBet = true;
+                                else { segments[i].type = finalType; segments[i].isDualBet = false; }
+                            }
+                            if (segments.length > lineStartIndex) segments[segments.length - 1].rawLine += subLine;
+                            return; 
                         }
+
+                        let chunkIsDual = REGEX_DUAL.test(subLine) || lineForwardDual;
+                        let explicitHK = new RegExp(PATTERN_HK).test(subLine) && !REGEX_DUAL.test(subLine);
+                        let explicitMO = new RegExp(PATTERN_MO).test(subLine) && !REGEX_DUAL.test(subLine);
+                        
+                        if (explicitHK && !explicitMO) { chunkIsDual = false; lineForwardDual = false; lineForwardType = 'HK'; globalType = 'HK'; globalDual = false; }
+                        else if (explicitMO && !explicitHK) { chunkIsDual = false; lineForwardDual = false; lineForwardType = 'MO'; globalType = 'MO'; globalDual = false; }
+                        
+                        if (chunkIsDual) { lineForwardDual = true; globalDual = true; }
+                        let chunkType = lineForwardType;
 
                         const res = parseContentWithoutAmount(subLine, chunkType, currentYearZodiac);
                         
-                        if (res.totalBetCount === 0 && subLine.trim() && !new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})$`).test(subLine.trim())) {
+                        if (res.totalBetCount === 0 && subLine.trim()) {
                             res.hasUnknown = true;
                         }
 
@@ -407,39 +449,46 @@
                             let defAmt = parseFloat(defaultAmtStr) || 0;
                             segments.push({ 
                                 numbers:res.numbers, totalBetCount:res.totalBetCount, amount:defAmt, 
-                                content:subLine, type:chunkType, isDualBet: lineIsDual,
+                                content:subLine, type:chunkType, isDualBet: chunkIsDual,
                                 isValid:res.totalBetCount>0&&(defAmt>0), rawLine:subLine, 
                                 isSuspicious:(res.totalBetCount>1&&!defAmt&&!/[元米斤块]/.test(subLine))||res.hasUnknown||(defAmt>=500&&defAmt%50!==0), fullLine:line 
                             });
                         }
                     } else {
                         let cursor = 0;
-                        let forwardDual = false;
-                        let forwardType = null;
 
                         matches.forEach(m => {
                             const amtTxt = m[0], idx = m.index;
                             const chunkContent = subLine.substring(cursor, idx).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
                             
-                            let amt = 0, numM = amtTxt.match(/(\d+(\.\d+)?)/); 
-                            if(numM) amt = parseFloat(numM[0]); 
-                            else { const chM=amtTxt.match(new RegExp(`[${CH_NUM}]+`)); if(chM) amt=parseChineseNumber(chM[0]); }
+                            let isActualDualMatch = REGEX_DUAL.test(chunkContent) || REGEX_DUAL.test(amtTxt);
+                            let chunkIsDual = isActualDualMatch || lineForwardDual;
+                            let explicitHK = new RegExp(PATTERN_HK).test(chunkContent);
+                            let explicitMO = new RegExp(PATTERN_MO).test(chunkContent);
                             
-                            if (chunkContent) { 
-                                let chunkIsDual = REGEX_DUAL.test(chunkContent) || REGEX_DUAL.test(amtTxt);
-                                let chunkType = globalType;
-                                
-                                if (chunkIsDual) {
-                                    forwardDual = true; 
-                                } else if (!forwardDual) {
-                                    if (new RegExp(PATTERN_HK).test(chunkContent)) { chunkType = 'HK'; globalType = 'HK'; forwardType = 'HK'; }
-                                    else if (new RegExp(PATTERN_MO).test(chunkContent)) { chunkType = 'MO'; globalType = 'MO'; forwardType = 'MO'; }
-                                }
-                                
-                                if (forwardDual) chunkIsDual = true;
-                                if (forwardType) chunkType = forwardType;
+                            if (isActualDualMatch) {
+                                lineForwardDual = true; globalDual = true; chunkIsDual = true;
+                            } else if (explicitHK && !explicitMO) {
+                                lineForwardDual = false; globalDual = false; chunkIsDual = false;
+                                lineForwardType = 'HK'; globalType = 'HK';
+                            } else if (explicitMO && !explicitHK) {
+                                lineForwardDual = false; globalDual = false; chunkIsDual = false;
+                                lineForwardType = 'MO'; globalType = 'MO';
+                            }
+                            
+                            let finalChunkType = lineForwardType;
 
-                                const res = parseContentWithoutAmount(chunkContent, chunkType, currentYearZodiac); 
+                            let amt = 0;
+                            const numMatch = amtTxt.match(/\d+(\.\d+)?/);
+                            if (numMatch) {
+                                amt = parseFloat(numMatch[0]);
+                            } else {
+                                const chMatch = amtTxt.match(new RegExp(`[${CH_NUM}]+`));
+                                if (chMatch) amt = parseChineseNumber(chMatch[0]);
+                            }
+
+                            if (chunkContent) { 
+                                const res = parseContentWithoutAmount(chunkContent, finalChunkType, currentYearZodiac); 
                                 
                                 if (res.totalBetCount === 0 && chunkContent.trim() && !new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})$`).test(chunkContent.trim())) {
                                     res.hasUnknown = true;
@@ -447,7 +496,7 @@
 
                                 segments.push({ 
                                     numbers:res.numbers, totalBetCount:res.totalBetCount, amount:amt, 
-                                    content:chunkContent, type:chunkType, isDualBet: chunkIsDual,
+                                    content:chunkContent, type:finalChunkType, isDualBet: chunkIsDual,
                                     isValid:amt>0 && res.totalBetCount>0, rawLine:chunkContent+amtTxt, 
                                     isSuspicious:(res.totalBetCount>1&&!/[各xX\/元米斤块=每号个]/.test(amtTxt))||res.hasUnknown||(amt>=500&&amt%50!==0), fullLine:line 
                                 }); 
@@ -457,24 +506,47 @@
                         
                         const trail = subLine.substring(cursor).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
                         if(trail) { 
-                            let trailIsDual = REGEX_DUAL.test(trail);
-                            let trailType = globalType;
-                            let hasExplicitType = false;
+                            let isActualDualMatch = REGEX_DUAL.test(trail);
+                            let trailIsDual = isActualDualMatch || lineForwardDual;
+                            let explicitHK = new RegExp(PATTERN_HK).test(trail);
+                            let explicitMO = new RegExp(PATTERN_MO).test(trail);
                             
-                            if (!trailIsDual) {
-                                if (new RegExp(PATTERN_HK).test(trail)) { trailType = 'HK'; globalType = 'HK'; hasExplicitType = true; }
-                                else if (new RegExp(PATTERN_MO).test(trail)) { trailType = 'MO'; globalType = 'MO'; hasExplicitType = true; }
+                            if (isActualDualMatch) {
+                                lineForwardDual = true; globalDual = true; trailIsDual = true;
+                            } else if (explicitHK && !explicitMO) {
+                                lineForwardDual = false; globalDual = false; trailIsDual = false;
+                                lineForwardType = 'HK'; globalType = 'HK';
+                            } else if (explicitMO && !explicitHK) {
+                                lineForwardDual = false; globalDual = false; trailIsDual = false;
+                                lineForwardType = 'MO'; globalType = 'MO';
                             }
 
-                            const res = parseContentWithoutAmount(trail, trailType, currentYearZodiac); 
+                            let finalTrailType = lineForwardType;
+
+                            const res = parseContentWithoutAmount(trail, finalTrailType, currentYearZodiac); 
                             
-                            if (res.totalBetCount === 0 && segments.length > startIndex && (trailIsDual || hasExplicitType)) {
-                                for (let i = startIndex; i < segments.length; i++) {
+                            if (res.totalBetCount === 0 && segments.length > lineStartIndex && (isPureNetStr(trail, 'DUAL') || isPureNetStr(trail, 'HK') || isPureNetStr(trail, 'MO'))) {
+                                let applyType = 'MO';
+                                let applyDual = false;
+                                if (isPureNetStr(trail, 'DUAL')) {
+                                    applyDual = true;
+                                    lineForwardDual = true; globalDual = true;
+                                } else if (isPureNetStr(trail, 'HK')) {
+                                    applyType = 'HK';
+                                    lineForwardDual = false; globalDual = false;
+                                    lineForwardType = 'HK'; globalType = 'HK';
+                                } else {
+                                    applyType = 'MO';
+                                    lineForwardDual = false; globalDual = false;
+                                    lineForwardType = 'MO'; globalType = 'MO';
+                                }
+
+                                for (let i = lineStartIndex; i < segments.length; i++) {
                                     if (i === segments.length - 1) segments[i].rawLine += trail;
-                                    if (trailIsDual) { 
+                                    if (applyDual) { 
                                         segments[i].isDualBet = true; 
-                                    } else if (hasExplicitType) {
-                                        segments[i].type = trailType;
+                                    } else {
+                                        segments[i].type = applyType;
                                         segments[i].isDualBet = false;
                                     }
                                 }
@@ -482,17 +554,11 @@
                                 let defAmt = parseFloat(defaultAmtStr) || 0;
                                 segments.push({ 
                                     numbers:res.numbers, totalBetCount:res.totalBetCount, amount:defAmt, 
-                                    content:trail, type:trailType, isDualBet: trailIsDual || forwardDual, 
+                                    content:trail, type:finalTrailType, isDualBet: trailIsDual, 
                                     isValid:res.totalBetCount>0&&(defAmt>0), rawLine:trail, 
                                     isSuspicious:!defAmt||res.hasUnknown, fullLine:line 
                                 }); 
                             }
-                        }
-                    }
-                    
-                    if (lineIsDual && segments.length > startIndex) {
-                        for (let i = startIndex; i < segments.length; i++) {
-                            segments[i].isDualBet = true;
                         }
                     }
                 });
