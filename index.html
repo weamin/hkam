@@ -30,14 +30,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- 引入 Firebase -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, initializeFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        
+    <!-- 锁定 Babel 稳定版，防止自动注入 import -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+    
+    <!-- 引入 Firebase Compat 兼容版，彻底告别 import 带来的 SyntaxError -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    
+    <script>
         const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         const fallbackConfig = { apiKey: "AIzaSyBiu3oe1z388azShoVkqZm0IK14kBanlXI", authDomain: "ordersys-5d951.firebaseapp.com", projectId: "ordersys-5d951", storageBucket: "ordersys-5d951.firebasestorage.app", messagingSenderId: "99865299874", appId: "1:99865299874:web:e891e5dcf25e5d6ab5c0fb" };
         const firebaseConfig = envConfig || fallbackConfig;
@@ -49,16 +51,48 @@
         };
 
         try {
-            const app = initializeApp(firebaseConfig);
-            const db = initializeFirestore(app, { experimentalForceLongPolling: true });
-            const auth = getAuth(app);
+            const app = firebase.initializeApp(firebaseConfig);
+            const db = firebase.firestore();
+            db.settings({ experimentalForceLongPolling: true });
+            const auth = firebase.auth();
+            
             const initAuth = async () => {
                 try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
-                    else { await signInAnonymously(auth); }
-                    window.db = db; window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc };
-                    window.isFirebaseReady = true; console.log("System Online");
-                } catch (err) { console.warn("Offline Mode", err); window.db = db; window.fb = { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, deleteDoc }; window.isFirebaseReady = true; }
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { 
+                        await auth.signInWithCustomToken(__initial_auth_token); 
+                    } else { 
+                        await auth.signInAnonymously(); 
+                    }
+                    window.db = db; 
+                    
+                    // 构建 fb 适配器，让老版本的 React 代码依然可以使用 V9 风格的调用
+                    window.fb = { 
+                        doc: (dbInstance, ...paths) => dbInstance.doc(paths.join('/')),
+                        getDoc: (docRef) => docRef.get(),
+                        setDoc: (docRef, data) => docRef.set(data),
+                        updateDoc: (docRef, data) => docRef.update(data),
+                        onSnapshot: (docRef, callback) => docRef.onSnapshot(callback),
+                        collection: (dbInstance, ...paths) => dbInstance.collection(paths.join('/')),
+                        getDocs: (colRef) => colRef.get(),
+                        deleteDoc: (docRef) => docRef.delete()
+                    };
+                    window.isFirebaseReady = true; 
+                    console.log("System Online");
+                } catch (err) { 
+                    console.warn("Offline Mode", err); 
+                    window.db = db; 
+                    window.fb = { 
+                        doc: (dbInstance, ...paths) => dbInstance.doc(paths.join('/')),
+                        getDoc: (docRef) => docRef.get(),
+                        setDoc: (docRef, data) => docRef.set(data),
+                        updateDoc: (docRef, data) => docRef.update(data),
+                        onSnapshot: (docRef, callback) => docRef.onSnapshot(callback),
+                        collection: (dbInstance, ...paths) => dbInstance.collection(paths.join('/')),
+                        getDocs: (colRef) => colRef.get(),
+                        deleteDoc: (docRef) => docRef.delete()
+                    }; 
+                    window.isFirebaseReady = true; 
+                }
             };
             initAuth();
         } catch (e) { window.isFirebaseReady = false; console.error("Firebase Init Error", e); }
@@ -83,7 +117,7 @@
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-presets="react">
         const { useState, useEffect, useMemo, useCallback } = React;
 
         class ErrorBoundary extends React.Component {
@@ -1260,7 +1294,7 @@
                    try {
                        const docRef = window.fb.doc("LOCAL", "access_codes", code);
                        const docSnap = await window.fb.getDoc(docRef);
-                       if (docSnap.exists()) {
+                       if (docSnap.exists) {
                            const data = docSnap.data();
                            if (Date.now() > data.expiresAt) { alert("此访问码已过期，请联系管理员续费。"); } else { onLogin(code, data); }
                        } else { alert("访问码不存在（本地）！"); }
@@ -1277,7 +1311,7 @@
                 try { 
                     const docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", code)); 
                     const docSnap = await window.fb.getDoc(docRef); 
-                    if (docSnap.exists()) { 
+                    if (docSnap.exists) { 
                         const data = docSnap.data(); 
                         if (Date.now() > data.expiresAt) { alert("此访问码已过期，请联系管理员续费。"); } else { onLogin(code, data); } 
                     } else { alert("访问码不存在，请重试！"); } 
@@ -1608,7 +1642,7 @@
                 } else {
                     docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode));
                 }
-                const unsub = window.fb.onSnapshot(docRef, (doc) => { if (doc.exists()) { const data = doc.data(); if (!window.isLocalMode && data.currentSessionId && data.currentSessionId !== sessionID) { alert("您的账号已在其他设备登录，您已被强制下线！"); handleLogout(); } } else { alert("账号不存在！"); handleLogout(); } }); return () => unsub(); }, [userCode, sessionID, isLocalMode]);
+                const unsub = window.fb.onSnapshot(docRef, (doc) => { if (doc.exists) { const data = doc.data(); if (!window.isLocalMode && data.currentSessionId && data.currentSessionId !== sessionID) { alert("您的账号已在其他设备登录，您已被强制下线！"); handleLogout(); } } else { alert("账号不存在！"); handleLogout(); } }); return () => unsub(); }, [userCode, sessionID, isLocalMode]);
             
             useEffect(() => { if (!userCode || !window.isFirebaseReady) return; const timer = setTimeout(() => { 
                 let docRef;
