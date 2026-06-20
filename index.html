@@ -247,7 +247,7 @@
             txt = txt.replace(/([元米斤块]){2,}/g, '$1');
             txt = txt.replace(/(各|买|每)[元米斤块]\s*(\d+(\.\d+)?)/g, '$1$2');
 
-            txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/(\d+)\s*[.,，;；*]+\s*(?:各)?\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
+            txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/尾数/g,'尾').replace(/头数/g,'头').replace(/(\d+)\s*[.,，;；*]+\s*(?:各)?\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
             txt = txt.replace(/(\d+)[.．。…~＇' -]*\s*到\s*[.．。…~＇' -]*(\d+)/g, (m,s,e) => { const n1=parseInt(s),n2=parseInt(e); return (n1<n2&&n2-n1<49) ? Array.from({length:n2-n1+1},(_,i)=>n1+i).join(' ') : m; });
             
             txt = txt.replace(new RegExp(`((?:\\d+[\\s.,，;；、*\\/。．…~＇' \\-—–−]+)+\\d+)[\\s.,，;；、*\\/。．…~＇' \\-—–−]*(?:各)?\\s*(岁|尾|头)`, 'g'), (m,n,s)=> {
