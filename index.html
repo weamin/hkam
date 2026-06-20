@@ -186,6 +186,8 @@
             if (!hasColon) return false;
             // 如果冒号前存在明显的下注动作词，说明这是正文（比如“各30:”）
             if (/(各|买|每|岁|元|块|尾|头)/.test(cleanText)) return false;
+            // 排除纯粹的网络标识行，比如“香:”、“奥:”
+            if (new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})[:：]?$`, 'i').test(cleanText)) return false;
             return true;
         };
 
@@ -217,7 +219,7 @@
                 const clean = line.trim(); 
                 if (!clean) return; 
                 // 遇到明确的聊天头部或者单独一行的网络标题，才会进行真实的换行断句
-                if (isChatHeader(clean) || new RegExp(`^(${PATTERN_HK}|${PATTERN_MO}|香|澳|门|奥|新澳门|老澳门)[:：]?$`).test(clean)) { 
+                if (isChatHeader(clean) || new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})[:：]?$`, 'i').test(clean)) { 
                     if (pending) { merged.push(pending); pending=""; } 
                     merged.push(clean); 
                     return; 
@@ -447,17 +449,20 @@
                         if (isPureNetStr(subLine, 'DUAL') || isPureNetStr(subLine, 'HK') || isPureNetStr(subLine, 'MO')) {
                             let finalType = 'MO';
                             let isDual = false;
+                            let currentExplicit = null;
                             if (isPureNetStr(subLine, 'DUAL')) {
-                                lineForwardDual = true; globalDual = true; isDual = true;
+                                lineForwardDual = true; globalDual = true; isDual = true; currentExplicit = 'DUAL';
                             } else if (isPureNetStr(subLine, 'HK')) {
-                                lineForwardDual = false; globalDual = false; lineForwardType = 'HK'; globalType = 'HK'; finalType = 'HK';
+                                lineForwardDual = false; globalDual = false; lineForwardType = 'HK'; globalType = 'HK'; finalType = 'HK'; currentExplicit = 'HK';
                             } else {
-                                lineForwardDual = false; globalDual = false; lineForwardType = 'MO'; globalType = 'MO'; finalType = 'MO';
+                                lineForwardDual = false; globalDual = false; lineForwardType = 'MO'; globalType = 'MO'; finalType = 'MO'; currentExplicit = 'MO';
                             }
                             
-                            for(let i = lineStartIndex; i < segments.length; i++) {
+                            for(let i = segments.length - 1; i >= lineStartIndex; i--) {
+                                if (segments[i].explicitType && segments[i].explicitType !== currentExplicit) break; // 撞到结界，停止向左传染
                                 if (isDual) segments[i].isDualBet = true;
                                 else { segments[i].type = finalType; segments[i].isDualBet = false; }
+                                segments[i].explicitType = currentExplicit;
                             }
                             if (segments.length > lineStartIndex) segments[segments.length - 1].rawLine += subLine;
                             return; 
@@ -467,10 +472,12 @@
                         let explicitHK = new RegExp(PATTERN_HK).test(subLine) && !REGEX_DUAL.test(subLine);
                         let explicitMO = new RegExp(PATTERN_MO).test(subLine) && !REGEX_DUAL.test(subLine);
                         
-                        if (explicitHK && !explicitMO) { chunkIsDual = false; lineForwardDual = false; lineForwardType = 'HK'; globalType = 'HK'; globalDual = false; }
-                        else if (explicitMO && !explicitHK) { chunkIsDual = false; lineForwardDual = false; lineForwardType = 'MO'; globalType = 'MO'; globalDual = false; }
+                        let currentExplicitType = null;
+                        if (explicitHK && !explicitMO) { chunkIsDual = false; lineForwardDual = false; lineForwardType = 'HK'; globalType = 'HK'; globalDual = false; currentExplicitType = 'HK'; }
+                        else if (explicitMO && !explicitHK) { chunkIsDual = false; lineForwardDual = false; lineForwardType = 'MO'; globalType = 'MO'; globalDual = false; currentExplicitType = 'MO'; }
+                        else if (REGEX_DUAL.test(subLine)) { currentExplicitType = 'DUAL'; }
                         
-                        if (chunkIsDual) { lineForwardDual = true; globalDual = true; }
+                        if (chunkIsDual) { lineForwardDual = true; globalDual = true; if (!currentExplicitType) currentExplicitType = 'DUAL'; }
                         let chunkType = lineForwardType;
 
                         const res = parseContentWithoutAmount(subLine, chunkType, currentYearZodiac);
@@ -485,7 +492,8 @@
                                 numbers:res.numbers, totalBetCount:res.totalBetCount, amount:defAmt, 
                                 content:subLine, type:chunkType, isDualBet: chunkIsDual,
                                 isValid:res.totalBetCount>0&&(defAmt>0), rawLine:subLine, 
-                                isSuspicious:(res.totalBetCount>1&&!defAmt&&!/[元米斤块]/.test(subLine))||res.hasUnknown||(defAmt>=500&&defAmt%50!==0), fullLine:line 
+                                isSuspicious:(res.totalBetCount>1&&!defAmt&&!/[元米斤块]/.test(subLine))||res.hasUnknown||(defAmt>=500&&defAmt%50!==0), fullLine:line,
+                                explicitType: currentExplicitType
                             });
                         }
                     } else {
@@ -500,14 +508,15 @@
                             let explicitHK = new RegExp(PATTERN_HK).test(chunkContent);
                             let explicitMO = new RegExp(PATTERN_MO).test(chunkContent);
                             
+                            let currentExplicitType = null;
                             if (isActualDualMatch) {
-                                lineForwardDual = true; globalDual = true; chunkIsDual = true;
+                                lineForwardDual = true; globalDual = true; chunkIsDual = true; currentExplicitType = 'DUAL';
                             } else if (explicitHK && !explicitMO) {
                                 lineForwardDual = false; globalDual = false; chunkIsDual = false;
-                                lineForwardType = 'HK'; globalType = 'HK';
+                                lineForwardType = 'HK'; globalType = 'HK'; currentExplicitType = 'HK';
                             } else if (explicitMO && !explicitHK) {
                                 lineForwardDual = false; globalDual = false; chunkIsDual = false;
-                                lineForwardType = 'MO'; globalType = 'MO';
+                                lineForwardType = 'MO'; globalType = 'MO'; currentExplicitType = 'MO';
                             }
                             
                             let finalChunkType = lineForwardType;
@@ -532,7 +541,8 @@
                                     numbers:res.numbers, totalBetCount:res.totalBetCount, amount:amt, 
                                     content:chunkContent, type:finalChunkType, isDualBet: chunkIsDual,
                                     isValid:amt>0 && res.totalBetCount>0, rawLine:chunkContent+amtTxt, 
-                                    isSuspicious:(res.totalBetCount>1&&!/[各xX\/元米斤块=每号个]/.test(amtTxt))||res.hasUnknown||(amt>=500&&amt%50!==0), fullLine:line 
+                                    isSuspicious:(res.totalBetCount>1&&!/[各xX\/元米斤块=每号个]/.test(amtTxt))||res.hasUnknown||(amt>=500&&amt%50!==0), fullLine:line,
+                                    explicitType: currentExplicitType
                                 }); 
                             }
                             cursor = idx + amtTxt.length;
@@ -545,14 +555,15 @@
                             let explicitHK = new RegExp(PATTERN_HK).test(trail);
                             let explicitMO = new RegExp(PATTERN_MO).test(trail);
                             
+                            let trailExplicitType = null;
                             if (isActualDualMatch) {
-                                lineForwardDual = true; globalDual = true; trailIsDual = true;
+                                lineForwardDual = true; globalDual = true; trailIsDual = true; trailExplicitType = 'DUAL';
                             } else if (explicitHK && !explicitMO) {
                                 lineForwardDual = false; globalDual = false; trailIsDual = false;
-                                lineForwardType = 'HK'; globalType = 'HK';
+                                lineForwardType = 'HK'; globalType = 'HK'; trailExplicitType = 'HK';
                             } else if (explicitMO && !explicitHK) {
                                 lineForwardDual = false; globalDual = false; trailIsDual = false;
-                                lineForwardType = 'MO'; globalType = 'MO';
+                                lineForwardType = 'MO'; globalType = 'MO'; trailExplicitType = 'MO';
                             }
 
                             let finalTrailType = lineForwardType;
@@ -562,20 +573,23 @@
                             if (res.totalBetCount === 0 && segments.length > lineStartIndex && (isPureNetStr(trail, 'DUAL') || isPureNetStr(trail, 'HK') || isPureNetStr(trail, 'MO'))) {
                                 let applyType = 'MO';
                                 let applyDual = false;
+                                let backwardsExplicitType = null;
                                 if (isPureNetStr(trail, 'DUAL')) {
                                     applyDual = true;
-                                    lineForwardDual = true; globalDual = true;
+                                    lineForwardDual = true; globalDual = true; backwardsExplicitType = 'DUAL';
                                 } else if (isPureNetStr(trail, 'HK')) {
                                     applyType = 'HK';
                                     lineForwardDual = false; globalDual = false;
-                                    lineForwardType = 'HK'; globalType = 'HK';
+                                    lineForwardType = 'HK'; globalType = 'HK'; backwardsExplicitType = 'HK';
                                 } else {
                                     applyType = 'MO';
                                     lineForwardDual = false; globalDual = false;
-                                    lineForwardType = 'MO'; globalType = 'MO';
+                                    lineForwardType = 'MO'; globalType = 'MO'; backwardsExplicitType = 'MO';
                                 }
 
-                                for (let i = lineStartIndex; i < segments.length; i++) {
+                                for (let i = segments.length - 1; i >= lineStartIndex; i--) {
+                                    if (segments[i].explicitType && segments[i].explicitType !== backwardsExplicitType) break; // 撞到结界，停止向左传染
+                                    
                                     if (i === segments.length - 1) segments[i].rawLine += trail;
                                     if (applyDual) { 
                                         segments[i].isDualBet = true; 
@@ -583,6 +597,7 @@
                                         segments[i].type = applyType;
                                         segments[i].isDualBet = false;
                                     }
+                                    segments[i].explicitType = backwardsExplicitType;
                                 }
                             } else if(res.totalBetCount > 0 || res.hasUnknown) {
                                 let defAmt = parseFloat(defaultAmtStr) || 0;
@@ -590,7 +605,8 @@
                                     numbers:res.numbers, totalBetCount:res.totalBetCount, amount:defAmt, 
                                     content:trail, type:finalTrailType, isDualBet: trailIsDual, 
                                     isValid:res.totalBetCount>0&&(defAmt>0), rawLine:trail, 
-                                    isSuspicious:!defAmt||res.hasUnknown, fullLine:line 
+                                    isSuspicious:!defAmt||res.hasUnknown, fullLine:line,
+                                    explicitType: trailExplicitType
                                 }); 
                             }
                         }
