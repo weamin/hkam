@@ -30,15 +30,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- 锁定 Babel 稳定版，防止自动注入 import -->
     <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
     
-    <!-- 引入 Firebase Compat 兼容版，彻底告别 import 带来的 SyntaxError -->
+    <!-- Firebase Compat SDKs (绕过安全拦截) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    
+
     <script>
         const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         const fallbackConfig = { apiKey: "AIzaSyBiu3oe1z388azShoVkqZm0IK14kBanlXI", authDomain: "ordersys-5d951.firebaseapp.com", projectId: "ordersys-5d951", storageBucket: "ordersys-5d951.firebasestorage.app", messagingSenderId: "99865299874", appId: "1:99865299874:web:e891e5dcf25e5d6ab5c0fb" };
@@ -53,46 +51,32 @@
         try {
             const app = firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
-            db.settings({ experimentalForceLongPolling: true });
             const auth = firebase.auth();
-            
             const initAuth = async () => {
                 try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { 
-                        await auth.signInWithCustomToken(__initial_auth_token); 
-                    } else { 
-                        await auth.signInAnonymously(); 
-                    }
-                    window.db = db; 
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await auth.signInWithCustomToken(__initial_auth_token); } 
+                    else { await auth.signInAnonymously(); }
                     
-                    // 构建 fb 适配器，让老版本的 React 代码依然可以使用 V9 风格的调用
-                    window.fb = { 
-                        doc: (dbInstance, ...paths) => dbInstance.doc(paths.join('/')),
+                    window.db = db;
+                    window.fb = {
+                        doc: (dbInst, ...args) => dbInst.collection(args[0]).doc(args.slice(1).join('/')),
+                        collection: (dbInst, ...args) => {
+                            let path = args.join('/');
+                            let parts = path.split('/');
+                            if(parts.length % 2 === 0) {
+                                return dbInst.collection(parts[0]).doc(parts.slice(1,2)[0]).collection(parts.slice(2).join('/'));
+                            }
+                            return dbInst.collection(path);
+                        },
                         getDoc: (docRef) => docRef.get(),
                         setDoc: (docRef, data) => docRef.set(data),
                         updateDoc: (docRef, data) => docRef.update(data),
+                        deleteDoc: (docRef) => docRef.delete(),
                         onSnapshot: (docRef, callback) => docRef.onSnapshot(callback),
-                        collection: (dbInstance, ...paths) => dbInstance.collection(paths.join('/')),
-                        getDocs: (colRef) => colRef.get(),
-                        deleteDoc: (docRef) => docRef.delete()
+                        getDocs: (colRef) => colRef.get()
                     };
-                    window.isFirebaseReady = true; 
-                    console.log("System Online");
-                } catch (err) { 
-                    console.warn("Offline Mode", err); 
-                    window.db = db; 
-                    window.fb = { 
-                        doc: (dbInstance, ...paths) => dbInstance.doc(paths.join('/')),
-                        getDoc: (docRef) => docRef.get(),
-                        setDoc: (docRef, data) => docRef.set(data),
-                        updateDoc: (docRef, data) => docRef.update(data),
-                        onSnapshot: (docRef, callback) => docRef.onSnapshot(callback),
-                        collection: (dbInstance, ...paths) => dbInstance.collection(paths.join('/')),
-                        getDocs: (colRef) => colRef.get(),
-                        deleteDoc: (docRef) => docRef.delete()
-                    }; 
-                    window.isFirebaseReady = true; 
-                }
+                    window.isFirebaseReady = true; console.log("System Online (Compat)");
+                } catch (err) { console.warn("Offline Mode", err); window.db = db; window.isFirebaseReady = true; }
             };
             initAuth();
         } catch (e) { window.isFirebaseReady = false; console.error("Firebase Init Error", e); }
@@ -161,10 +145,11 @@
         })();
 
         const PATTERN_HK = "香港|香|港"; 
-        const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥"; 
+        const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥门|奥"; 
         
-        // 限制标点符号的长度，防止奥门......香港被误切
-        const REGEX_DUAL = new RegExp("([香港][\\s.,，;；:：和]{0,2}[澳门奥])|([澳门奥][\\s.,，;；:：和]{0,2}[香港])|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(双面网)|(双网)|(两网)|(各买一遍)", "i");
+        // 【核心修复1】：在标点容错中加入句号“。”、“的”，并加入“同下”、“奥门”的支持
+        const COMBO_DUAL = "((?:香港|香|港)[\\s.,，。;；:：和的]{0,2}(?:澳门|澳|门|奥门|奥))|((?:澳门|澳|门|奥门|奥)[\\s.,，。;；:：和的]{0,2}(?:香港|香|港))";
+        const REGEX_DUAL = new RegExp(`${COMBO_DUAL}|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(双面网)|(双网)|(两网)|(各买一遍)|(同下)`, "i");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
         
         const BASE_AMOUNT_PARTS = [
@@ -179,7 +164,7 @@
         const REGEX_AMOUNT_NO_SLASH = new RegExp(BASE_AMOUNT_PARTS, 'gi');
         const REGEX_AMOUNT_WITH_SLASH = new RegExp(`${BASE_AMOUNT_PARTS}|(\\/[\\s.．。…~＇']*\\d+(\\.\\d+)?\\s*[${UNITS}]?)`, 'gi');
 
-        // 智能微信聊天头部识别：行尾是冒号，且前面**不包含**下注动作相关的词
+        // 智能微信聊天头部识别
         const isChatHeader = (text) => {
             const cleanText = text.trim();
             const hasColon = /[:：]\s*$/.test(cleanText);
@@ -218,7 +203,6 @@
             lines.forEach(line => { 
                 const clean = line.trim(); 
                 if (!clean) return; 
-                // 遇到明确的聊天头部或者单独一行的网络标题，才会进行真实的换行断句
                 if (isChatHeader(clean) || new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})[:：]?$`, 'i').test(clean)) { 
                     if (pending) { merged.push(pending); pending=""; } 
                     merged.push(clean); 
@@ -226,7 +210,6 @@
                 } 
                 pending += (pending && !/^[岁尾头]/.test(clean) ? " " : "") + clean; 
                 
-                // 性能优化：如果在修改时输入过长，主动断句
                 if (pending.length > 500) {
                      merged.push(pending);
                      pending = "";
@@ -245,10 +228,10 @@
             txt = txt.replace(/各?\s*[一1]?\s*遍/g, ' ');
             txt = txt.replace(/(香门)|(港门)|(门香)/g, ' '); 
             
-            // 核心修复：处理多余的“元元”手误
             txt = txt.replace(/([元米斤块]){2,}/g, '$1');
             txt = txt.replace(/(各|买|每)[元米斤块]\s*(\d+(\.\d+)?)/g, '$1$2');
 
+            // 【核心修复2】：“尾数”、“头数” 智能转译
             txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/尾数/g,'尾').replace(/头数/g,'头').replace(/(\d+)\s*[.,，;；*]+\s*(?:各)?\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
             txt = txt.replace(/(\d+)[.．。…~＇' -]*\s*到\s*[.．。…~＇' -]*(\d+)/g, (m,s,e) => { const n1=parseInt(s),n2=parseInt(e); return (n1<n2&&n2-n1<49) ? Array.from({length:n2-n1+1},(_,i)=>n1+i).join(' ') : m; });
             
@@ -374,15 +357,15 @@
         const parseContentForSegments = (text, defaultAmtStr, currentYearZodiac) => {
             const PURE_NET_PREFIX = "(?:[买下打去]?\\s*)";
             const HK_REGEX_STR = `${PATTERN_HK}|香|港`;
-            const MO_REGEX_STR = `${PATTERN_MO}|澳|门|奥|新澳门|老澳门`;
-            const DUAL_REGEX_STR = "香门|港门|香奥|港奥|港澳|澳港|双面网|双网|两网|各买一遍";
+            const MO_REGEX_STR = `${PATTERN_MO}|澳|门|奥|新澳门|老澳门|奥门`;
+            const DUAL_REGEX_STR = "香门|港门|香奥|港奥|港澳|澳港|双面网|双网|两网|各买一遍|同下"; // 包含“同下”
 
             const isPureNetStr = (str, type) => {
-                const clean = str.trim().replace(/^[.,，;；:：]+|[.,，;；:：]+$/g, '');
+                const clean = str.trim().replace(/^[.,，。;；:：]+|[.,，。;；:：]+$/g, '');
                 if (!clean) return false;
-                if (type === 'DUAL') return new RegExp(`^${PURE_NET_PREFIX}(${DUAL_REGEX_STR}|([香港][\\s.,，;；:：和]{0,2}[澳门奥])|([澳门奥][\\s.,，;；:：和]{0,2}[香港]))$`, 'i').test(clean);
-                if (type === 'HK') return new RegExp(`^${PURE_NET_PREFIX}(${HK_REGEX_STR})$`, 'i').test(clean) && !new RegExp(`(${MO_REGEX_STR})`, 'i').test(clean);
-                if (type === 'MO') return new RegExp(`^${PURE_NET_PREFIX}(${MO_REGEX_STR})$`, 'i').test(clean) && !new RegExp(`(${HK_REGEX_STR})`, 'i').test(clean);
+                if (type === 'DUAL') return new RegExp(`^${PURE_NET_PREFIX}(${DUAL_REGEX_STR}|${COMBO_DUAL})([\\s.,，。;；:：的]*(各买一遍|同下))?$`, 'i').test(clean);
+                if (type === 'HK') return new RegExp(`^${PURE_NET_PREFIX}(${HK_REGEX_STR})([\\s.,，。;；:：的]*(各买一遍|同下))?$`, 'i').test(clean) && !new RegExp(`(${MO_REGEX_STR})`, 'i').test(clean);
+                if (type === 'MO') return new RegExp(`^${PURE_NET_PREFIX}(${MO_REGEX_STR})([\\s.,，。;；:：的]*(各买一遍|同下))?$`, 'i').test(clean) && !new RegExp(`(${HK_REGEX_STR})`, 'i').test(clean);
                 return false;
             };
 
@@ -420,16 +403,20 @@
 
                 let processedLine = line.replace(/(\d)个/g, '$1 '); 
                 
-                const nextBetStart = '(?=[\\s.,，;；]*[\\d鼠牛虎兔龙蛇马羊猴鸡狗猪单双大小合红蓝绿])';
-                const p1 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)[\\s.,，;；]*(香港|香|港)${nextBetStart}`, 'g');
-                const p2 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，;；]*)(香港|香|港)[\\s.,，;；]*([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)${nextBetStart}`, 'g');
+                // 【核心修复3】：把各买一遍翻译为内部指令同下，穿上防吞字护甲
+                processedLine = processedLine.replace(/各?[买下打]?[一1][遍次]/g, '同下');
+                
+                // 【核心修复4】：加入中文句号“。”、“：”、“的”，修复夹击断句的分割
+                const nextBetStart = '(?=[\\s.,，。;；:：的]*[\\d鼠牛虎兔龙蛇马羊猴鸡狗猪单双大小合红蓝绿])';
+                const p1 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，。;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)[\\s.,，。;；:：和的]{1,3}(香港|香|港)${nextBetStart}`, 'g');
+                const p2 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，。;；]*)(香港|香|港)[\\s.,，。;；:：和的]{1,3}([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)${nextBetStart}`, 'g');
 
                 processedLine = processedLine.replace(p1, '$1$2\n$3');
                 processedLine = processedLine.replace(p2, '$1$2\n$3');
                 
-                processedLine = processedLine.replace(/(\d+(?:[.,，;；、]+\d+){2,})\s*([元米斤块])/g, '$1 ERROR_AMOUNT_MISSING ');
-                processedLine = processedLine.replace(/((?:每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)\s*[\d零一二三四五六七八九十百千]+(?:[\.]\d+)?[元米斤块]?)\s*[，,;；]\s*/g, '$1\n');
-                processedLine = processedLine.replace(/(\d+(\.\d+)?\s*[/]\s*\d+(\.\d+)?)\s*[，,;；]\s*/g, '$1\n');
+                processedLine = processedLine.replace(/(\d+(?:[.,，。;；、]+\d+){2,})\s*([元米斤块])/g, '$1 ERROR_AMOUNT_MISSING ');
+                processedLine = processedLine.replace(/((?:每个号各|每个号|每号各|每个|每号|个号|个|各|买|x|X|号|=|每)\s*[\d零一二三四五六七八九十百千]+(?:[\.]\d+)?[元米斤块]?)\s*[，,。;；]\s*/g, '$1\n');
+                processedLine = processedLine.replace(/(\d+(\.\d+)?\s*[/]\s*\d+(\.\d+)?)\s*[，,。;；]\s*/g, '$1\n');
                 
                 let splitParts = processedLine.split(processedLine.includes('\n')?'\n':(processedLine.includes('另外')?'另外':/a^/));
                 
@@ -458,8 +445,9 @@
                                 lineForwardDual = false; globalDual = false; lineForwardType = 'MO'; globalType = 'MO'; finalType = 'MO'; currentExplicit = 'MO';
                             }
                             
+                            // 【核心修复5】：左右显式结界，防止越界传染
                             for(let i = segments.length - 1; i >= lineStartIndex; i--) {
-                                if (segments[i].explicitType && segments[i].explicitType !== currentExplicit) break; // 撞到结界，停止向左传染
+                                if (segments[i].explicitType && segments[i].explicitType !== currentExplicit) break; 
                                 if (isDual) segments[i].isDualBet = true;
                                 else { segments[i].type = finalType; segments[i].isDualBet = false; }
                                 segments[i].explicitType = currentExplicit;
@@ -501,7 +489,7 @@
 
                         matches.forEach(m => {
                             const amtTxt = m[0], idx = m.index;
-                            const chunkContent = subLine.substring(cursor, idx).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
+                            const chunkContent = subLine.substring(cursor, idx).trim().replace(/^[.,，。;；、\/\-*\—–−。：:+…~＇']+/g, '');
                             
                             let isActualDualMatch = REGEX_DUAL.test(chunkContent) || REGEX_DUAL.test(amtTxt);
                             let chunkIsDual = isActualDualMatch || lineForwardDual;
@@ -548,7 +536,7 @@
                             cursor = idx + amtTxt.length;
                         });
                         
-                        const trail = subLine.substring(cursor).trim().replace(/^[.,，;；、\/\-*\—–−。：:+…~＇']+/g, '');
+                        const trail = subLine.substring(cursor).trim().replace(/^[.,，。;；、\/\-*\—–−。：:+…~＇']+/g, '');
                         if(trail) { 
                             let isActualDualMatch = REGEX_DUAL.test(trail);
                             let trailIsDual = isActualDualMatch || lineForwardDual;
@@ -655,10 +643,10 @@
             }); 
             
             const renderHighlightedTokens = (text) => { 
-                const tokens = text.split(new RegExp(`([\\s.,，;；、*\\/。．…~＇' -]+|[${ZODIAC_LIST.join('')}])`)); 
+                const tokens = text.split(new RegExp(`([\\s.,，。;；、*\\/。．…~＇' -]+|[${ZODIAC_LIST.join('')}])`)); 
                 return tokens.map((t, idx) => { 
                     if (!t) return null; 
-                    if (/^[.,，;；、*\/。．…~＇' -]+$/.test(t)) return <span key={idx} className="text-slate-400">{t}</span>; 
+                    if (/^[.,，。;；、*\/。．…~＇' -]+$/.test(t)) return <span key={idx} className="text-slate-400">{t}</span>; 
                     let isValid = !isNaN(parseInt(t)) ? (parseInt(t)>=1&&parseInt(t)<=49) : (KEYWORDS[t.toUpperCase()] || ZODIAC_LIST.includes(t) || /^[岁尾头]$/.test(t.slice(-1)) || ['各','买','x','X','号','=','每','元','米','斤','块','个','个号'].some(k=>t.includes(k)) || /^合(数)?\d+$/.test(t) || t === 'ERROR_AMOUNT_MISSING'); 
                     return <span key={idx} className={`inline-block px-1 rounded mx-0.5 ${isValid && t !== 'ERROR_AMOUNT_MISSING' ?'bg-green-100 text-green-800':'bg-red-600 text-white font-bold'}`}>{t}</span>; 
                 }); 
@@ -792,18 +780,18 @@
         const RawRecordModal = ({ batch, onClose }) => ( <ModalContainer> <div className="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl"> <h3 className="font-bold text-lg mb-4 border-b pb-2">原始下单记录</h3> <div className="bg-slate-100 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto text-slate-700"> <div className="font-bold mb-2 text-slate-900">{batch.header}</div> {batch.originalTotal && <div className="text-orange-600 font-bold mb-2">手写总计: {batch.originalTotal}</div>} <pre className="whitespace-pre-wrap break-all">{batch.fullText || batch.lines.join('\n')}</pre> </div> <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow btn-press">关闭</button> </div> </ModalContainer> );
         
         const HedgingModal = ({ onClose, riskStats, riskFilter, customers, bets, showAlert, transfers, onSaveTransfers, hedgingHistory, setHedgingHistory, setConfirmation }) => { 
-            const [activeType, setActiveType] = useState(riskFilter==='HK'?'HK':'MO'); 
-            const [hedgingTarget, setHedgingTarget] = useState('ALL'); 
-            const [maxBetLimit, setMaxBetLimit] = useState('500'); 
-            const [copyMsg, setCopyMsg] = useState(''); 
-            const [suggestedEat, setSuggestedEat] = useState(0); 
-            const [showHistory, setShowHistory] = useState(false);
+            const [activeType, useState, useEffect, useMemo] = React.useState(riskFilter==='HK'?'HK':'MO'); 
+            const [hedgingTarget, setHedgingTarget] = React.useState('ALL'); 
+            const [maxBetLimit, setMaxBetLimit] = React.useState('500'); 
+            const [copyMsg, setCopyMsg] = React.useState(''); 
+            const [suggestedEat, setSuggestedEat] = React.useState(0); 
+            const [showHistory, setShowHistory] = React.useState(false);
             
-            const [manualAdvices, setManualAdvices] = useState({});
+            const [manualAdvices, setManualAdvices] = React.useState({});
 
-            const activeCustomers = useMemo(() => Array.from(new Set(bets.map(b => b.customerName))).sort(), [bets]); 
+            const activeCustomers = React.useMemo(() => Array.from(new Set(bets.map(b => b.customerName))).sort(), [bets]); 
             
-            useEffect(() => {
+            React.useEffect(() => {
                 setManualAdvices({});
             }, [activeType, hedgingTarget]);
 
@@ -827,7 +815,7 @@
                 setManualAdvices(prev => ({...prev, [num]: netBet}));
             };
 
-            const safeTransfers = useMemo(() => {
+            const safeTransfers = React.useMemo(() => {
                 const result = { hk: { _global: {} }, mo: { _global: {} } };
                 ['hk', 'mo'].forEach(type => {
                     if (transfers[type]) {
@@ -843,7 +831,7 @@
                 return result;
             }, [transfers]);
             
-            const currentRiskStats = useMemo(() => { 
+            const currentRiskStats = React.useMemo(() => { 
                 let filtered = bets.filter(b => !b.isError && !b.isTransferred); 
                 if (hedgingTarget !== 'ALL') filtered = filtered.filter(b => b.customerName === hedgingTarget); 
                 const stats = { hk:Array.from({length:49},(_,i)=>({num:i+1, totalBet:0})), mo:Array.from({length:49},(_,i)=>({num:i+1, totalBet:0})) }; 
@@ -871,7 +859,7 @@
             
             const { list: data, pool: rawTotalPool } = activeType === 'HK' ? currentRiskStats.hk : currentRiskStats.mo; 
             
-            const displayData = useMemo(() => { 
+            const displayData = React.useMemo(() => { 
                 const limit = parseFloat(maxBetLimit) || 0; 
                 const processed = data.map(d => { 
                     const autoAdvice = Math.max(0, d.netBet - limit); 
@@ -887,7 +875,7 @@
                 }); 
             }, [data, maxBetLimit, rawTotalPool, manualAdvices]);
             
-            useEffect(() => { 
+            React.useEffect(() => { 
                 const netBets = data.map(d => d.netBet);
                 if (netBets.length === 0) return;
                 const maxVal = Math.max(...netBets);
@@ -920,7 +908,7 @@
             const maxWin = Math.max(...displayData.map(d => d.bankerPL)); 
             const maxLoss = Math.min(...displayData.map(d => d.bankerPL)); 
             
-            const totalAdviceAmount = useMemo(() => displayData.reduce((acc, d) => acc + d.advice, 0), [displayData]);
+            const totalAdviceAmount = React.useMemo(() => displayData.reduce((acc, d) => acc + d.advice, 0), [displayData]);
             
             const copyAndSave = () => { 
                 const toTransfer = displayData.filter(d => d.advice > 0); 
@@ -1147,11 +1135,11 @@
         };
 
         const AdminPanel = ({ onClose, db }) => { 
-            const [code, setCode] = useState(''); 
-            const [days, setDays] = useState(30); 
-            const [codes, setCodes] = useState([]); 
-            const [renewTarget, setRenewTarget] = useState(null); 
-            const [renewDays, setRenewDays] = useState(30);
+            const [code, setCode] = React.useState(''); 
+            const [days, setDays] = React.useState(30); 
+            const [codes, setCodes] = React.useState([]); 
+            const [renewTarget, setRenewTarget] = React.useState(null); 
+            const [renewDays, setRenewDays] = React.useState(30);
 
             const fetchCodes = async () => { 
                 if(!db || !window.fb) return; 
@@ -1167,7 +1155,7 @@
                 } catch(e) { alert("获取数据失败: " + e.message); } 
             }; 
             
-            useEffect(() => { fetchCodes(); }, []); 
+            React.useEffect(() => { fetchCodes(); }, []); 
             
             const handleCreate = async () => { 
                 if(!code) return; 
@@ -1299,8 +1287,8 @@
             ); 
         };
         const LoginScreen = ({ onLogin, onAdmin }) => { 
-            const [code, setCode] = useState(''); 
-            const [loading, setLoading] = useState(false); 
+            const [code, setCode] = React.useState(''); 
+            const [loading, setLoading] = React.useState(false); 
             
             const handleLogin = async () => { 
                 if(!code) return; 
@@ -1459,9 +1447,9 @@
                     const w = b.winHK+b.winMO;
                     let lbl = '';
                     if(w>0) {
-                        if(b.winHK>0 && b.winMO>0) lbl=` [中: ¥${w} (港${b.winHK}+门${b.winMO})]`;
-                        else if(b.winHK>0) lbl=` [中: ¥${w} (港)]`;
-                        else lbl=` [中: ¥${w}]`;
+                        if(b.winHK>0 && b.winMO>0) lbl=` [¥${w} (港${b.winHK}+门${b.winMO})]`;
+                        else if(b.winHK>0) lbl=` [¥${w} (港)]`;
+                        else lbl=` [¥${w}]`;
                     }
                     return `(${b.idx})合计: ${b.total}${lbl}`;
                 }).join('\n');
@@ -1725,7 +1713,7 @@
                         <div id="app-header" className="bg-indigo-600 text-white p-4 shadow-lg flex justify-between items-center">
                             <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5 text-yellow-300"/> 订单管理系统 ({currentYearZodiac}年)</div>
                             <div className="flex gap-2">
-                                <button onClick={()=>setShowSettings(true)} className="bg-white/20 px-2 py-1 rounded text-xs font-bold btn-press">客户</button>
+                                <button onClick={()=>setShowSettings(true)} className="bg-white/20 px-2 py-1 rounded text-xs font-bold btn-press">客户管理</button>
                                 <button onClick={handleLogout} className="bg-red-500/80 px-2 py-1 rounded text-xs font-bold btn-press">退出</button>
                             </div>
                         </div>
@@ -1776,7 +1764,7 @@
                             {/* Risk Tab */}
                             {activeTab === 'risk' && <div className="h-full flex flex-col overflow-hidden"><div className="flex justify-between mb-2 shrink-0"><div className="flex bg-white rounded-lg border p-1 text-xs font-bold shadow-sm"><button onClick={()=>setRiskFilter('MO')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='MO'?'bg-green-500 text-white shadow-sm':'text-slate-500'}`}>澳</button><button onClick={()=>setRiskFilter('HK')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='HK'?'bg-red-500 text-white shadow-sm':'text-slate-500'}`}>港</button><button onClick={()=>setRiskFilter('ALL')} className={`px-3 py-1.5 rounded-md transition-all ${riskFilter==='ALL'?'bg-indigo-500 text-white shadow-sm':'text-slate-500'}`}>全</button></div><button onClick={()=>setShowHedgingModal(true)} className="bg-orange-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-md shadow-orange-200 btn-press"><Icon name="Scale" className="w-4 h-4"/> 智能吃码</button></div><div className="flex-1 overflow-y-auto grid grid-cols-2 gap-3 pb-24">{(riskFilter==='ALL'||riskFilter==='MO')&&<MobileRiskTable title="🇲🇴 澳门" color="green" data={riskStats.mo} total={riskStats.moPool} />}{(riskFilter==='ALL'||riskFilter==='HK')&&<MobileRiskTable title="🇭🇰 香港" color="red" data={riskStats.hk} total={riskStats.hkPool} />}</div></div>}
                             {/* Reconciliation Tab */}
-                            {activeTab === 'reconciliation' && <div className="space-y-4"><div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 sticky top-[72px] z-40 grid grid-cols-2 gap-4"><div><div className="text-xs text-green-600 font-bold text-center mb-1">🇲🇴 澳彩开奖</div><input type="number" placeholder="输入" value={winningNumberMO} onChange={e=>setWinningNumberMO(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-green-100 rounded-xl py-2 text-green-600 focus:border-green-300 outline-none bg-green-50/30"/></div><div><div className="text-xs text-red-600 font-bold text-center mb-1">🇭🇰 港彩开奖</div><input type="number" placeholder="输入" value={winningNumberHK} onChange={e=>setWinningNumberHK(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-red-100 rounded-xl py-2 text-red-600 focus:border-red-300 outline-none bg-red-50/30"/></div></div><div className="space-y-3">{reconciliationStats.map(s => <div key={s.name} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 group" onClick={()=>setExpandedReconciliation(expandedReconciliation===s.name?null:s.name)}><div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2"><div className="font-bold text-lg text-slate-800">{s.name}</div><div className={`font-bold text-xl ${s.profit>=0?'text-red-600':'text-green-600'}`}>{s.profit>=0?'+':''}{s.profit.toFixed(0)}</div></div><div className="grid grid-cols-3 gap-2 text-xs text-center mb-2"><div className="bg-slate-50 p-1.5 rounded-lg font-bold text-slate-600">流水: {s.totalStake}</div><div className="bg-indigo-50 p-1.5 rounded-lg text-indigo-600 font-bold border border-indigo-100">中: {s.winningStakeTotal}</div><div className="bg-slate-50 p-1.5 rounded-lg text-slate-500">退: {s.rebateAmt.toFixed(0)}</div></div>{expandedReconciliation===s.name && <div className="bg-slate-50 p-3 rounded-xl text-xs font-mono mt-2 space-y-2 border border-slate-100 animate-fade-in"><div className="flex flex-col gap-3">{s.batchDetails.map(b => {const winTot = b.winHK+b.winMO; let winLbl = ''; if(winTot>0) { if(b.winHK>0 && b.winMO>0) winLbl=`[中: ¥${winTot} (港${b.winHK}+门${b.winMO})]`; else if(b.winHK>0) winLbl=`[中: ¥${winTot} (港)]`; else winLbl=`[中: ¥${winTot}]`; } return (<div key={b.idx} className="flex justify-between items-start border-b border-slate-200 last:border-0 pb-1" onClick={(e)=>{e.stopPropagation();setViewingRawBatch(b)}}><span className="font-bold text-slate-600">({b.idx}) 合计: {b.total}</span>{winTot>0 && <span className="text-red-600 font-bold bg-red-50 px-1 rounded">{winLbl}</span>}</div>);})}</div><button onClick={(e)=>{e.stopPropagation(); copyRec(s);}} className="w-full mt-2 bg-indigo-600 text-white py-2.5 rounded-lg font-bold shadow-md shadow-indigo-200 btn-press flex items-center justify-center gap-1"><Icon name="Copy" className="w-4 h-4"/> 复制完整对账单</button></div>}</div>)}</div></div>}
+                            {activeTab === 'reconciliation' && <div className="space-y-4"><div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 sticky top-[72px] z-40 grid grid-cols-2 gap-4"><div><div className="text-xs text-green-600 font-bold text-center mb-1">🇲🇴 澳彩开奖</div><input type="number" placeholder="输入" value={winningNumberMO} onChange={e=>setWinningNumberMO(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-green-100 rounded-xl py-2 text-green-600 focus:border-green-300 outline-none bg-green-50/30"/></div><div><div className="text-xs text-red-600 font-bold text-center mb-1">🇭🇰 港彩开奖</div><input type="number" placeholder="输入" value={winningNumberHK} onChange={e=>setWinningNumberHK(e.target.value)} className="w-full text-center text-2xl font-bold border-2 border-red-100 rounded-xl py-2 text-red-600 focus:border-red-300 outline-none bg-red-50/30"/></div></div><div className="space-y-3">{reconciliationStats.map(s => <div key={s.name} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 group" onClick={()=>setExpandedReconciliation(expandedReconciliation===s.name?null:s.name)}><div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2"><div className="font-bold text-lg text-slate-800">{s.name}</div><div className={`font-bold text-xl ${s.profit>=0?'text-red-600':'text-green-600'}`}>{s.profit>=0?'+':''}{s.profit.toFixed(0)}</div></div><div className="grid grid-cols-3 gap-2 text-xs text-center mb-2"><div className="bg-slate-50 p-1.5 rounded-lg font-bold text-slate-600">流水: {s.totalStake}</div><div className="bg-indigo-50 p-1.5 rounded-lg text-indigo-600 font-bold border border-indigo-100">中: {s.winningStakeTotal}</div><div className="bg-slate-50 p-1.5 rounded-lg text-slate-500">退: {s.rebateAmt.toFixed(0)}</div></div>{expandedReconciliation===s.name && <div className="bg-slate-50 p-3 rounded-xl text-xs font-mono mt-2 space-y-2 border border-slate-100 animate-fade-in"><div className="flex flex-col gap-3">{s.batchDetails.map(b => {const winTot = b.winHK+b.winMO; let winLbl = ''; if(winTot>0) { if(b.winHK>0 && b.winMO>0) winLbl=`[¥${winTot} (港${b.winHK}+门${b.winMO})]`; else if(b.winHK>0) winLbl=`[¥${winTot} (港)]`; else winLbl=`[¥${winTot}]`; } return (<div key={b.idx} className="flex justify-between items-start border-b border-slate-200 last:border-0 pb-1" onClick={(e)=>{e.stopPropagation();setViewingRawBatch(b)}}><span className="font-bold text-slate-600">({b.idx}) 合计: {b.total}</span>{winTot>0 && <span className="text-red-600 font-bold bg-red-50 px-1 rounded">{winLbl}</span>}</div>);})}</div><button onClick={(e)=>{e.stopPropagation(); copyRec(s);}} className="w-full mt-2 bg-indigo-600 text-white py-2.5 rounded-lg font-bold shadow-md shadow-indigo-200 btn-press flex items-center justify-center gap-1"><Icon name="Copy" className="w-4 h-4"/> 复制完整对账单</button></div>}</div>)}</div></div>}
                         </div>
 
                         {/* Modals */}
@@ -1796,12 +1784,19 @@
                         {textPreview && (
                             <div className="fixed inset-0 z-[6000] bg-white flex flex-col animate-fade-in">
                                 {/* 顶部栏 */}
-                                <div className="flex justify-between items-center p-4 border-b bg-slate-50 shrink-0 shadow-sm">
-                                    <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                                        <Icon name="FileText" className="w-5 h-5 text-indigo-600"/> 
-                                        {textPreview.title.replace(' 对账详单', '')}
+                                <div className="flex justify-between items-center p-3 border-b bg-slate-50 shrink-0 shadow-sm">
+                                    <h3 className="font-bold text-base text-slate-800 flex items-center gap-1 truncate max-w-[30%]">
+                                        <Icon name="FileText" className="w-4 h-4 text-indigo-600 shrink-0"/> 
+                                        <span className="truncate">{textPreview.title.replace(' 对账详单', '')}</span>
                                     </h3>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {/* 字号调节移动到了这里，变得更紧凑 */}
+                                        <div className="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm">
+                                            <button onClick={()=>setPreviewFontSize(s=>Math.max(9, s-1))} className="w-7 h-7 flex items-center justify-center bg-slate-50 text-xs font-bold text-slate-600 rounded-l-lg border-r active:bg-slate-200">A-</button>
+                                            <span className="text-[10px] font-mono w-5 text-center text-slate-600">{previewFontSize}</span>
+                                            <button onClick={()=>setPreviewFontSize(s=>Math.min(24, s+1))} className="w-7 h-7 flex items-center justify-center bg-slate-50 text-xs font-bold text-slate-600 rounded-r-lg border-l active:bg-slate-200">A+</button>
+                                        </div>
+
                                         <button onClick={()=>{
                                             const el=document.createElement('textarea');
                                             el.value=textPreview.content;
@@ -1814,19 +1809,13 @@
                                             <Icon name="Copy" className="w-4 h-4"/> 复制
                                         </button>
                                         <button onClick={()=>setTextPreview(null)} className="p-1 btn-press text-slate-500">
-                                            <Icon name="X" className="w-6 h-6"/>
+                                            <Icon name="X" className="w-5 h-5"/>
                                         </button>
                                     </div>
                                 </div>
                                 
-                                {/* 字体调节与全屏文本区域 - 字体优化适配手机 */}
+                                {/* 全屏文本区域 */}
                                 <div className="flex-1 relative bg-white flex flex-col">
-                                     <div className="flex justify-end items-center gap-2 p-2 border-b bg-slate-50/50">
-                                        <span className="text-xs text-slate-400">字号:</span>
-                                        <button onClick={()=>setPreviewFontSize(s=>Math.max(9, s-1))} className="w-8 h-8 flex items-center justify-center bg-white border rounded text-sm font-bold text-slate-600 shadow-sm">A-</button>
-                                        <span className="text-xs font-mono w-6 text-center">{previewFontSize}</span>
-                                        <button onClick={()=>setPreviewFontSize(s=>Math.min(24, s+1))} className="w-8 h-8 flex items-center justify-center bg-white border rounded text-sm font-bold text-slate-600 shadow-sm">A+</button>
-                                    </div>
                                     <textarea 
                                         id="preview-text" 
                                         className="flex-1 w-full p-4 font-mono leading-relaxed resize-none outline-none text-slate-700 bg-white" 
