@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>订单管理系统 v7.16 (终极稳定版)</title>
     
-    <!-- 1. 安全卫士 -->
     <script>
         (function() {
             const ALLOWED_DOMAINS = ['localhost', '127.0.0.1', 'firebaseapp.com', 'web.app', 'usercontent', 'google', 'blob:', 'github.io'];
@@ -32,7 +31,6 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
     
-    <!-- Firebase Compat SDKs (绕过安全拦截) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -138,16 +136,40 @@
             k['合数双']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2===0); k['合双']=ALL_NUMBERS.filter(n=>getSumDigit(n)%2===0);
             k['小数双'] = k['小双']; k['大数双'] = k['大双']; k['小数单'] = k['小单']; k['大数单'] = k['大单'];
             k['红波']=WAVES.RED; k['红']=WAVES.RED; k['蓝波']=WAVES.BLUE; k['蓝']=WAVES.BLUE; k['绿波']=WAVES.GREEN; k['绿']=WAVES.GREEN;
-            const rO=WAVES.RED.filter(isOdd), rE=WAVES.RED.filter(isEven); const bO=WAVES.BLUE.filter(isOdd), bE=WAVES.BLUE.filter(isEven); const gO=WAVES.GREEN.filter(isOdd), gE=WAVES.GREEN.filter(isEven);
-            k['红单']=rO; k['红波单']=rO; k['红双']=rE; k['红波双']=rE; k['蓝单']=bO; k['蓝波单']=bO; k['蓝双']=bE; k['蓝波双']=bE; k['绿单']=gO; k['绿波单']=gO; k['绿双']=gE; k['绿波双']=gE;
-            k['红绿单']=[...rO, ...gO]; k['红绿双']=[...rE, ...gE]; k['红蓝单']=[...rO, ...bO]; k['红蓝双']=[...rE, ...bE]; k['蓝绿单']=[...bO, ...gO]; k['蓝绿双']=[...bE, ...gE];
+            
+            // 单双波色过滤
+            const rO=WAVES.RED.filter(isOdd), rE=WAVES.RED.filter(isEven); 
+            const bO=WAVES.BLUE.filter(isOdd), bE=WAVES.BLUE.filter(isEven); 
+            const gO=WAVES.GREEN.filter(isOdd), gE=WAVES.GREEN.filter(isEven);
+            
+            k['红单']=rO; k['红波单']=rO; k['红双']=rE; k['红波双']=rE; 
+            k['蓝单']=bO; k['蓝波单']=bO; k['蓝双']=bE; k['蓝波双']=bE; 
+            k['绿单']=gO; k['绿波单']=gO; k['绿双']=gE; k['绿波双']=gE;
+            k['红绿单']=[...rO, ...gO]; k['红绿双']=[...rE, ...gE]; 
+            k['红蓝单']=[...rO, ...bO]; k['红蓝双']=[...rE, ...bE]; 
+            k['蓝绿单']=[...bO, ...gO]; k['蓝绿双']=[...bE, ...gE];
+
+            // === 新增：大小波色过滤 ===
+            const rB=WAVES.RED.filter(isBig), rS=WAVES.RED.filter(isSmall);
+            const bB=WAVES.BLUE.filter(isBig), bS=WAVES.BLUE.filter(isSmall);
+            const gB=WAVES.GREEN.filter(isBig), gS=WAVES.GREEN.filter(isSmall);
+
+            k['红大']=rB; k['红波大']=rB; k['红波大数']=rB;
+            k['红小']=rS; k['红波小']=rS; k['红波小数']=rS;
+            
+            k['蓝大']=bB; k['蓝波大']=bB; k['蓝波大数']=bB;
+            k['蓝小']=bS; k['蓝波小']=bS; k['蓝波小数']=bS;
+            
+            k['绿大']=gB; k['绿波大']=gB; k['绿波大数']=gB;
+            k['绿小']=gS; k['绿波小']=gS; k['绿波小数']=gS;
+            // =========================
+
             return k;
         })();
 
         const PATTERN_HK = "香港|香|港"; 
         const PATTERN_MO = "新澳门|老澳门|奥特|噢T|溴T|澳门|澳|门|奥门|奥"; 
         
-        // 【核心修复1】：在标点容错中加入句号“。”、“的”，并加入“同下”、“奥门”的支持
         const COMBO_DUAL = "((?:香港|香|港)[\\s.,，。;；:：和的]{0,2}(?:澳门|澳|门|奥门|奥))|((?:澳门|澳|门|奥门|奥)[\\s.,，。;；:：和的]{0,2}(?:香港|香|港))";
         const REGEX_DUAL = new RegExp(`${COMBO_DUAL}|(香门)|(港门)|(香奥)|(港奥)|(港澳)|(澳港)|(双面网)|(双网)|(两网)|(各买一遍)|(同下)`, "i");
         const CH_NUM = "零一二三四五六七八九十百千两"; const UNITS = "元米斤块";
@@ -164,14 +186,11 @@
         const REGEX_AMOUNT_NO_SLASH = new RegExp(BASE_AMOUNT_PARTS, 'gi');
         const REGEX_AMOUNT_WITH_SLASH = new RegExp(`${BASE_AMOUNT_PARTS}|(\\/[\\s.．。…~＇']*\\d+(\\.\\d+)?\\s*[${UNITS}]?)`, 'gi');
 
-        // 智能微信聊天头部识别
         const isChatHeader = (text) => {
             const cleanText = text.trim();
             const hasColon = /[:：]\s*$/.test(cleanText);
             if (!hasColon) return false;
-            // 如果冒号前存在明显的下注动作词，说明这是正文（比如“各30:”）
             if (/(各|买|每|岁|元|块|尾|头)/.test(cleanText)) return false;
-            // 排除纯粹的网络标识行，比如“香:”、“奥:”
             if (new RegExp(`^(${PATTERN_HK}|${PATTERN_MO})[:：]?$`, 'i').test(cleanText)) return false;
             return true;
         };
@@ -231,7 +250,6 @@
             txt = txt.replace(/([元米斤块]){2,}/g, '$1');
             txt = txt.replace(/(各|买|每)[元米斤块]\s*(\d+(\.\d+)?)/g, '$1$2');
 
-            // 【核心修复2】：“尾数”、“头数” 智能转译
             txt = txt.replace(new RegExp(PATTERN_HK,'g'),' ').replace(new RegExp(PATTERN_MO,'g'),' ').replace(REGEX_DUAL,' ').replace(/免/g,'兔').replace(/(个号|个)/g,' 各 ').replace(/[Tt]/g,' ').replace(/(每个|每|一共|总计)/g,' 各 ').replace(/号/g,' ').replace(/岁数/g,'岁').replace(/尾数/g,'尾').replace(/头数/g,'头').replace(/(\d+)\s*[.,，;；*]+\s*(?:各)?\s*(岁|尾|头)/g,'$1$2').replace(/(\d(岁|尾|头))\s*(\/)\s*(\d)/g,'$1 $4').replace(/([岁尾头])(\d)/g,'$1 $2');
             txt = txt.replace(/(\d+)[.．。…~＇' -]*\s*到\s*[.．。…~＇' -]*(\d+)/g, (m,s,e) => { const n1=parseInt(s),n2=parseInt(e); return (n1<n2&&n2-n1<49) ? Array.from({length:n2-n1+1},(_,i)=>n1+i).join(' ') : m; });
             
@@ -358,7 +376,7 @@
             const PURE_NET_PREFIX = "(?:[买下打去]?\\s*)";
             const HK_REGEX_STR = `${PATTERN_HK}|香|港`;
             const MO_REGEX_STR = `${PATTERN_MO}|澳|门|奥|新澳门|老澳门|奥门`;
-            const DUAL_REGEX_STR = "香门|港门|香奥|港奥|港澳|澳港|双面网|双网|两网|各买一遍|同下"; // 包含“同下”
+            const DUAL_REGEX_STR = "香门|港门|香奥|港奥|港澳|澳港|双面网|双网|两网|各买一遍|同下";
 
             const isPureNetStr = (str, type) => {
                 const clean = str.trim().replace(/^[.,，。;；:：]+|[.,，。;；:：]+$/g, '');
@@ -390,10 +408,7 @@
             lines.forEach(line => {
                 if (isChatHeader(line)) return;
                 
-                if (isPureNetStr(line, 'DUAL')) {
-                    globalDual = true;
-                    return;
-                }
+                if (isPureNetStr(line, 'DUAL')) { globalDual = true; return; }
                 if (isPureNetStr(line, 'HK') || isPureNetStr(line, 'MO')) {
                     globalDual = false; 
                     if (isPureNetStr(line, 'HK')) globalType = 'HK';
@@ -402,11 +417,8 @@
                 }
 
                 let processedLine = line.replace(/(\d)个/g, '$1 '); 
-                
-                // 【核心修复3】：把各买一遍翻译为内部指令同下，穿上防吞字护甲
                 processedLine = processedLine.replace(/各?[买下打]?[一1][遍次]/g, '同下');
                 
-                // 【核心修复4】：加入中文句号“。”、“：”、“的”，修复夹击断句的分割
                 const nextBetStart = '(?=[\\s.,，。;；:：的]*[\\d鼠牛虎兔龙蛇马羊猴鸡狗猪单双大小合红蓝绿])';
                 const p1 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，。;；]*)([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)[\\s.,，。;；:：和的]{1,3}(香港|香|港)${nextBetStart}`, 'g');
                 const p2 = new RegExp(`([\\d元米斤块遍岁尾头][\\s.,，。;；]*)(香港|香|港)[\\s.,，。;；:：和的]{1,3}([奥澳][门]?|[新老]?[澳奥]门|噢T|溴T)${nextBetStart}`, 'g');
@@ -428,7 +440,6 @@
                     if(!subLine.trim()) return;
                     
                     let startIndex = segments.length;
-                    
                     const regex = /(各|买|=|每|号)/.test(subLine) ? REGEX_AMOUNT_NO_SLASH : REGEX_AMOUNT_WITH_SLASH;
                     const matches = Array.from(subLine.matchAll(regex));
 
@@ -437,15 +448,10 @@
                             let finalType = 'MO';
                             let isDual = false;
                             let currentExplicit = null;
-                            if (isPureNetStr(subLine, 'DUAL')) {
-                                lineForwardDual = true; globalDual = true; isDual = true; currentExplicit = 'DUAL';
-                            } else if (isPureNetStr(subLine, 'HK')) {
-                                lineForwardDual = false; globalDual = false; lineForwardType = 'HK'; globalType = 'HK'; finalType = 'HK'; currentExplicit = 'HK';
-                            } else {
-                                lineForwardDual = false; globalDual = false; lineForwardType = 'MO'; globalType = 'MO'; finalType = 'MO'; currentExplicit = 'MO';
-                            }
+                            if (isPureNetStr(subLine, 'DUAL')) { lineForwardDual = true; globalDual = true; isDual = true; currentExplicit = 'DUAL'; } 
+                            else if (isPureNetStr(subLine, 'HK')) { lineForwardDual = false; globalDual = false; lineForwardType = 'HK'; globalType = 'HK'; finalType = 'HK'; currentExplicit = 'HK'; } 
+                            else { lineForwardDual = false; globalDual = false; lineForwardType = 'MO'; globalType = 'MO'; finalType = 'MO'; currentExplicit = 'MO'; }
                             
-                            // 【核心修复5】：左右显式结界，防止越界传染
                             for(let i = segments.length - 1; i >= lineStartIndex; i--) {
                                 if (segments[i].explicitType && segments[i].explicitType !== currentExplicit) break; 
                                 if (isDual) segments[i].isDualBet = true;
@@ -470,9 +476,7 @@
 
                         const res = parseContentWithoutAmount(subLine, chunkType, currentYearZodiac);
                         
-                        if (res.totalBetCount === 0 && subLine.trim()) {
-                            res.hasUnknown = true;
-                        }
+                        if (res.totalBetCount === 0 && subLine.trim()) { res.hasUnknown = true; }
 
                         if (res.totalBetCount > 0 || res.hasUnknown || subLine.trim()) {
                             let defAmt = parseFloat(defaultAmtStr) || 0;
@@ -486,7 +490,6 @@
                         }
                     } else {
                         let cursor = 0;
-
                         matches.forEach(m => {
                             const amtTxt = m[0], idx = m.index;
                             const chunkContent = subLine.substring(cursor, idx).trim().replace(/^[.,，。;；、\/\-*\—–−。：:+…~＇']+/g, '');
@@ -555,36 +558,21 @@
                             }
 
                             let finalTrailType = lineForwardType;
-
                             const res = parseContentWithoutAmount(trail, finalTrailType, currentYearZodiac); 
                             
                             if (res.totalBetCount === 0 && segments.length > lineStartIndex && (isPureNetStr(trail, 'DUAL') || isPureNetStr(trail, 'HK') || isPureNetStr(trail, 'MO'))) {
                                 let applyType = 'MO';
                                 let applyDual = false;
                                 let backwardsExplicitType = null;
-                                if (isPureNetStr(trail, 'DUAL')) {
-                                    applyDual = true;
-                                    lineForwardDual = true; globalDual = true; backwardsExplicitType = 'DUAL';
-                                } else if (isPureNetStr(trail, 'HK')) {
-                                    applyType = 'HK';
-                                    lineForwardDual = false; globalDual = false;
-                                    lineForwardType = 'HK'; globalType = 'HK'; backwardsExplicitType = 'HK';
-                                } else {
-                                    applyType = 'MO';
-                                    lineForwardDual = false; globalDual = false;
-                                    lineForwardType = 'MO'; globalType = 'MO'; backwardsExplicitType = 'MO';
-                                }
+                                if (isPureNetStr(trail, 'DUAL')) { applyDual = true; lineForwardDual = true; globalDual = true; backwardsExplicitType = 'DUAL'; } 
+                                else if (isPureNetStr(trail, 'HK')) { applyType = 'HK'; lineForwardDual = false; globalDual = false; lineForwardType = 'HK'; globalType = 'HK'; backwardsExplicitType = 'HK'; } 
+                                else { applyType = 'MO'; lineForwardDual = false; globalDual = false; lineForwardType = 'MO'; globalType = 'MO'; backwardsExplicitType = 'MO'; }
 
                                 for (let i = segments.length - 1; i >= lineStartIndex; i--) {
-                                    if (segments[i].explicitType && segments[i].explicitType !== backwardsExplicitType) break; // 撞到结界，停止向左传染
-                                    
+                                    if (segments[i].explicitType && segments[i].explicitType !== backwardsExplicitType) break; 
                                     if (i === segments.length - 1) segments[i].rawLine += trail;
-                                    if (applyDual) { 
-                                        segments[i].isDualBet = true; 
-                                    } else {
-                                        segments[i].type = applyType;
-                                        segments[i].isDualBet = false;
-                                    }
+                                    if (applyDual) { segments[i].isDualBet = true; } 
+                                    else { segments[i].type = applyType; segments[i].isDualBet = false; }
                                     segments[i].explicitType = backwardsExplicitType;
                                 }
                             } else if(res.totalBetCount > 0 || res.hasUnknown) {
@@ -780,7 +768,7 @@
         const RawRecordModal = ({ batch, onClose }) => ( <ModalContainer> <div className="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl"> <h3 className="font-bold text-lg mb-4 border-b pb-2">原始下单记录</h3> <div className="bg-slate-100 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto text-slate-700"> <div className="font-bold mb-2 text-slate-900">{batch.header}</div> {batch.originalTotal && <div className="text-orange-600 font-bold mb-2">手写总计: {batch.originalTotal}</div>} <pre className="whitespace-pre-wrap break-all">{batch.fullText || batch.lines.join('\n')}</pre> </div> <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow btn-press">关闭</button> </div> </ModalContainer> );
         
         const HedgingModal = ({ onClose, riskStats, riskFilter, customers, bets, showAlert, transfers, onSaveTransfers, hedgingHistory, setHedgingHistory, setConfirmation }) => { 
-            const [activeType, useState, useEffect, useMemo] = React.useState(riskFilter==='HK'?'HK':'MO'); 
+            const [activeType, setActiveType] = React.useState(riskFilter==='HK'?'HK':'MO'); 
             const [hedgingTarget, setHedgingTarget] = React.useState('ALL'); 
             const [maxBetLimit, setMaxBetLimit] = React.useState('500'); 
             const [copyMsg, setCopyMsg] = React.useState(''); 
@@ -1134,7 +1122,7 @@
             ); 
         };
 
-        const AdminPanel = ({ onClose, db }) => { 
+        const AdminPanel = ({ onClose, db, showAlert, setConfirmation }) => { 
             const [code, setCode] = React.useState(''); 
             const [days, setDays] = React.useState(30); 
             const [codes, setCodes] = React.useState([]); 
@@ -1152,14 +1140,14 @@
                     }
                     const snap = await window.fb.getDocs(colRef); 
                     setCodes(snap.docs.map(d => ({id: d.id, ...d.data()}))); 
-                } catch(e) { alert("获取数据失败: " + e.message); } 
+                } catch(e) { showAlert("获取数据失败: " + e.message, "error"); } 
             }; 
             
             React.useEffect(() => { fetchCodes(); }, []); 
             
             const handleCreate = async () => { 
                 if(!code) return; 
-                if(!db || !window.fb) { alert("数据库未连接"); return; } 
+                if(!db || !window.fb) { showAlert("数据库未连接", "error"); return; } 
                 const expiry = new Date(); 
                 expiry.setDate(expiry.getDate() + parseInt(days)); 
                 
@@ -1171,7 +1159,7 @@
                 }
                 
                 await window.fb.setDoc(docRef, { isActive: true, expiresAt: expiry.getTime(), bets: [], customers: [], transfers: { hk:{}, mo:{} }, hedgingHistory: [] }); 
-                alert("访问码 " + code + " 创建成功！"); 
+                showAlert("访问码 " + code + " 创建成功！", "success"); 
                 fetchCodes(); 
                 setCode(''); 
             }; 
@@ -1191,22 +1179,28 @@
 
                 await window.fb.updateDoc(docRef, { expiresAt: newExpiry });
                 
-                alert(`用户 ${renewTarget.id} 已成功延期！`);
+                showAlert(`用户 ${renewTarget.id} 已成功延期！`, "success");
                 setRenewTarget(null);
                 fetchCodes();
             };
             
             const handleDelete = async (id) => { 
-                if(confirm("确定删除 " + id + " 吗？此操作不可恢复！")) { 
-                    let docRef;
-                    if (window.isLocalMode) {
-                        docRef = window.fb.doc("LOCAL", "access_codes", id);
-                    } else {
-                        docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id));
-                    }
-                    await window.fb.deleteDoc(docRef); 
-                    fetchCodes(); 
-                } 
+                setConfirmation({
+                    message: "确定删除 " + id + " 吗？此操作不可恢复！",
+                    onConfirm: async () => {
+                        let docRef;
+                        if (window.isLocalMode) {
+                            docRef = window.fb.doc("LOCAL", "access_codes", id);
+                        } else {
+                            docRef = window.fb.doc(db, ...window.DB_PATH.getDocArgs("access_codes", id));
+                        }
+                        await window.fb.deleteDoc(docRef); 
+                        fetchCodes();
+                        setConfirmation(null);
+                        showAlert("已删除", "success");
+                    },
+                    onCancel: () => setConfirmation(null)
+                });
             }; 
             
             return ( 
@@ -1286,7 +1280,8 @@
                 </div> 
             ); 
         };
-        const LoginScreen = ({ onLogin, onAdmin }) => { 
+        
+        const LoginScreen = ({ onLogin, onAdmin, showAlert }) => { 
             const [code, setCode] = React.useState(''); 
             const [loading, setLoading] = React.useState(false); 
             
@@ -1300,14 +1295,14 @@
                        const docSnap = await window.fb.getDoc(docRef);
                        if (docSnap.exists) {
                            const data = docSnap.data();
-                           if (Date.now() > data.expiresAt) { alert("此访问码已过期，请联系管理员续费。"); } else { onLogin(code, data); }
-                       } else { alert("访问码不存在（本地）！"); }
-                   } catch(e) { console.error(e); alert("本地存储错误"); }
+                           if (Date.now() > data.expiresAt) { showAlert("此访问码已过期，请联系管理员续费。", "error"); } else { onLogin(code, data); }
+                       } else { showAlert("访问码不存在（本地）！", "error"); }
+                   } catch(e) { console.error(e); showAlert("本地存储错误", "error"); }
                    setLoading(false);
                    return;
                 }
                 if (!window.isFirebaseReady) { 
-                    alert("正在连接云端数据库，请稍等 2-3 秒后重试..."); 
+                    showAlert("正在连接云端数据库，请稍等 2-3 秒后重试...", "warning"); 
                     return; 
                 }
                 if(code === 'admin888') { onAdmin(); return; } 
@@ -1317,9 +1312,9 @@
                     const docSnap = await window.fb.getDoc(docRef); 
                     if (docSnap.exists) { 
                         const data = docSnap.data(); 
-                        if (Date.now() > data.expiresAt) { alert("此访问码已过期，请联系管理员续费。"); } else { onLogin(code, data); } 
-                    } else { alert("访问码不存在，请重试！"); } 
-                } catch(e) { console.error(e); alert("登录出错: " + e.message); } 
+                        if (Date.now() > data.expiresAt) { showAlert("此访问码已过期，请联系管理员续费。", "error"); } else { onLogin(code, data); } 
+                    } else { showAlert("访问码不存在，请重试！", "error"); } 
+                } catch(e) { console.error(e); showAlert("登录出错: " + e.message, "error"); } 
                 setLoading(false); 
             }; 
             return ( <div className="min-h-screen login-bg flex items-center justify-center p-4"> <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in relative overflow-hidden"> 
@@ -1348,7 +1343,11 @@
             const [inputCustomer, setInputCustomer] = useState(''); const [inputContent, setInputContent] = useState(''); const [defaultAmount, setDefaultAmount] = useState('');
             const [activeTab, setActiveTab] = useState('input'); const [showSettings, setShowSettings] = useState(false); const [showCustomerModal, setShowCustomerModal] = useState(false);
             const [actionSheet, setActionSheet] = useState(null); const [tempCustomers, setTempCustomers] = useState([]); const [batchToEdit, setBatchToEdit] = useState(null);
-            const [message, setMessage] = useState(null); const [confirmation, setConfirmation] = useState(null); const [showHedgingModal, setShowHedgingModal] = useState(false);
+            
+            const [message, setMessage] = useState(null); 
+            const [confirmation, setConfirmation] = useState(null); 
+            
+            const [showHedgingModal, setShowHedgingModal] = useState(false);
             const [textPreview, setTextPreview] = useState(null); const [winningNumberHK, setWinningNumberHK] = useState(''); const [winningNumberMO, setWinningNumberMO] = useState('');
             const [expandedReconciliation, setExpandedReconciliation] = useState(null); const [viewingRawBatch, setViewingRawBatch] = useState(null);
             const [previewBatches, setPreviewBatches] = useState([]); const [riskFilter, setRiskFilter] = useState('ALL'); const [bookMode, setBookMode] = useState('ALL'); const [bookTarget, setBookTarget] = useState('');
@@ -1360,6 +1359,8 @@
             const [insertBatchTarget, setInsertBatchTarget] = useState(null);
 
             const errorCount = useMemo(() => bets.filter(b => b.isError).map(b => b.batchId).filter((v, i, a) => a.indexOf(v) === i).length, [bets]);
+
+            const showAlert = (text, type='error') => { setMessage({text,type}); setTimeout(()=>setMessage(null),3000); };
 
             useEffect(() => {
                 const txt = inputContent.trim();
@@ -1525,7 +1526,7 @@
                 const newRecs = []; 
                 const segments = parseContentForSegments(lines.join('\n'), '0', currentYearZodiac);
                 segments.forEach(s => (s.isDualBet?['HK','MO']:[s.type]).forEach(t => newRecs.push({ id:batchId+Math.random(), batchId, customerName:oldBatch.customerName, type:t, numbers:s.numbers, totalBetCount:s.totalBetCount, amountPerNumber:s.amount, totalAmount:s.totalBetCount*(s.isValid&&!s.isSuspicious?s.amount:0), timestamp:oldBatch.timestamp, rawInput:s.rawLine, formattedContent:s.rawLine, originalHeader:oldBatch.originalHeader, isError:!s.isValid||s.isSuspicious, originalTotal:segments[0]?.clientTotal||'', fullText:oldBatch.fullText, isTransferred: oldBatch.isTransferred || false })));
-                setBets(prev => [...prev.filter(b=>b.batchId!==batchId), ...newRecs]); setBatchToEdit(null); showAlert('修改保存成功');
+                setBets(prev => [...prev.filter(b=>b.batchId!==batchId), ...newRecs]); setBatchToEdit(null); showAlert('修改保存成功', 'success');
             };
 
             const handleInsertBatchAfter = (targetBatchId, text) => {
@@ -1627,7 +1628,6 @@
             });
 
             const handleDeleteBatchWithModal = (batchId) => setConfirmation({ message: "确定要删除此笔订单吗？", onConfirm: () => { setBets(p => p.filter(b => b.batchId !== batchId)); setConfirmation(null); showAlert('已删除', 'success'); }, onCancel: () => setConfirmation(null) });
-            const showAlert = (text, type='error') => { setMessage({text,type}); setTimeout(()=>setMessage(null),3000); };
             const handleUpdateCustomerField = (id, k, v) => setTempCustomers(prev=>prev.map(c=>c.id===id?{...c,[k]:v}:c));
             const handleSaveCustomers = () => { 
                 const sanitized = tempCustomers.map(c => ({
@@ -1646,7 +1646,7 @@
                 } else {
                     docRef = window.fb.doc(window.db, ...window.DB_PATH.getDocArgs("access_codes", userCode));
                 }
-                const unsub = window.fb.onSnapshot(docRef, (doc) => { if (doc.exists) { const data = doc.data(); if (!window.isLocalMode && data.currentSessionId && data.currentSessionId !== sessionID) { alert("您的账号已在其他设备登录，您已被强制下线！"); handleLogout(); } } else { alert("账号不存在！"); handleLogout(); } }); return () => unsub(); }, [userCode, sessionID, isLocalMode]);
+                const unsub = window.fb.onSnapshot(docRef, (doc) => { if (doc.exists) { const data = doc.data(); if (!window.isLocalMode && data.currentSessionId && data.currentSessionId !== sessionID) { showAlert("您的账号已在其他设备登录，您已被强制下线！", "error"); handleLogout(); } } else { showAlert("账号不存在！", "error"); handleLogout(); } }); return () => unsub(); }, [userCode, sessionID, isLocalMode]);
             
             useEffect(() => { if (!userCode || !window.isFirebaseReady) return; const timer = setTimeout(() => { 
                 let docRef;
@@ -1704,11 +1704,11 @@
                 setHedgingHistory([]);
             };
 
-            if (!userCode && !isAdmin) return <ErrorBoundary><LoginScreen onLogin={handleLoginSuccess} onAdmin={()=>setIsAdmin(true)} /></ErrorBoundary>;
-            if (isAdmin) return <ErrorBoundary><AdminPanel onClose={()=>setIsAdmin(false)} db={window.db}/></ErrorBoundary>;
+            const renderContent = () => {
+                if (!userCode && !isAdmin) return <LoginScreen onLogin={handleLoginSuccess} onAdmin={()=>setIsAdmin(true)} showAlert={showAlert} />;
+                if (isAdmin) return <AdminPanel onClose={()=>setIsAdmin(false)} db={window.db} showAlert={showAlert} setConfirmation={setConfirmation} />;
 
-            return (
-                <ErrorBoundary>
+                return (
                     <div className="max-w-md mx-auto min-h-screen bg-gray-50 flex flex-col">
                         <div id="app-header" className="bg-indigo-600 text-white p-4 shadow-lg flex justify-between items-center">
                             <div className="flex items-center gap-2 font-bold text-lg"><Icon name="Zap" className="w-5 h-5 text-yellow-300"/> 订单管理系统 ({currentYearZodiac}年)</div>
@@ -1717,7 +1717,6 @@
                                 <button onClick={handleLogout} className="bg-red-500/80 px-2 py-1 rounded text-xs font-bold btn-press">退出</button>
                             </div>
                         </div>
-                        {message && <div className={`fixed top-20 left-4 right-4 p-3 rounded-lg shadow-xl text-white z-[9999] text-center ${message.type==='error'||message.type==='warning'?'bg-red-500':'bg-green-500'} animate-fade-in`}>{message.text}</div>}
                         <div id="app-content" className="flex-1 p-4">
                             {activeTab === 'input' && (
                                 <div className="flex flex-col h-full gap-4">
@@ -1775,7 +1774,7 @@
                         
                         {insertOrderTarget && <InsertOrderModal customerName={insertOrderTarget} onClose={()=>setInsertOrderTarget(null)} onSave={handleInsertBatchFromModal} />}
                         {insertBatchTarget && <InsertAfterBatchModal batchId={insertBatchTarget} bets={bets} onClose={()=>setInsertBatchTarget(null)} onSave={handleInsertBatchAfter} />}
-                        <ConfirmationModal confirmation={confirmation} />
+                        
                         {showCustomerModal && <CustomerSelectModal customers={customers} onSelect={n=>{setInputCustomer(n);setShowCustomerModal(false);showAlert(`已切换: ${n}`, 'success')}} onClose={()=>setShowCustomerModal(false)} />}
                         {actionSheet && <ActionSheet title={actionSheet.title} actions={actionSheet.actions} onCancel={actionSheet.onCancel} />}
                         {showSettings && <div id="app-modal" className="flex items-center justify-center p-4 animate-fade-in"><div className="bg-white w-full max-w-lg rounded-xl p-4 max-h-[80vh] overflow-y-auto"><div className="flex justify-between items-center mb-4 pb-2 border-b"><h3 className="font-bold text-lg">客户管理</h3><button onClick={()=>setShowSettings(false)} className="btn-press"><Icon name="X" className="w-6 h-6 text-slate-500"/></button></div><div className="space-y-2">{tempCustomers.map(c=><div key={c.id} className="flex gap-2 items-center"><input value={c.name} onChange={e=>handleUpdateCustomerField(c.id,'name',e.target.value)} className="border p-2 rounded w-24 text-sm" placeholder="姓名"/><input type="text" inputMode="decimal" value={c.odds} onChange={e=>handleUpdateCustomerField(c.id,'odds',e.target.value)} className="border p-2 rounded w-16 text-sm" placeholder="赔率"/><input type="text" inputMode="decimal" value={c.rebateStr} onChange={e=>handleUpdateCustomerField(c.id,'rebateStr',e.target.value)} className="border p-2 rounded w-16 text-sm" placeholder="退水%"/><button onClick={()=>setTempCustomers(prev=>prev.filter(x=>x.id!==c.id))} className="btn-press"><Icon name="Trash2" className="w-5 h-5 text-red-500"/></button></div>)}</div><div className="mt-4 flex gap-2"><button onClick={()=>setTempCustomers([...tempCustomers, {id:Math.random().toString(),name:'',customerType:'客户',odds:'47.5',rebateStr:'2',aliases:[]}])} className="flex-1 bg-green-500 text-white py-2 rounded font-bold btn-press">新增客户</button><button onClick={handleSaveCustomers} className="flex-1 bg-blue-500 text-white py-2 rounded font-bold btn-press">保存设置</button></div></div></div>}
@@ -1790,7 +1789,6 @@
                                         <span className="truncate">{textPreview.title.replace(' 对账详单', '')}</span>
                                     </h3>
                                     <div className="flex items-center gap-2 shrink-0">
-                                        {/* 字号调节移动到了这里，变得更紧凑 */}
                                         <div className="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm">
                                             <button onClick={()=>setPreviewFontSize(s=>Math.max(9, s-1))} className="w-7 h-7 flex items-center justify-center bg-slate-50 text-xs font-bold text-slate-600 rounded-l-lg border-r active:bg-slate-200">A-</button>
                                             <span className="text-[10px] font-mono w-5 text-center text-slate-600">{previewFontSize}</span>
@@ -1845,8 +1843,16 @@
                             <button onClick={()=>setActiveTab('risk')} className={`flex flex-col items-center gap-1 p-2 ${activeTab==='risk'?'text-indigo-600 font-bold scale-105':'text-slate-400'}`}><Icon name="ShieldAlert" className="w-6 h-6"/>风控</button>
                         </div>
                     </div>
+                );
+            };
+
+            return (
+                <ErrorBoundary>
+                    {renderContent()}
+                    {message && <div className={`fixed top-20 left-4 right-4 p-3 rounded-lg shadow-xl text-white z-[9999] text-center ${message.type==='error'||message.type==='warning'?'bg-red-500':'bg-green-500'} animate-fade-in`}>{message.text}</div>}
+                    <ConfirmationModal confirmation={confirmation} />
                 </ErrorBoundary>
-            );
+            )
         }
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
